@@ -1,0 +1,8 @@
+{
+  "name": "Trace One",
+  "description": "AI Observability Workspace - Real-time exception monitoring, root cause investigation, and Gemini-powered pull request generator.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
