@@ -19,12 +19,48 @@ export default function SettingsPage() {
   const [notifPR, setNotifPR] = useState(true)
   const [notifWeekly, setNotifWeekly] = useState(false)
 
+  const [githubUser, setGithubUser] = useState<any | null>(null)
+  const [githubLoading, setGithubLoading] = useState(true)
+
   useEffect(() => {
     if (profile) {
       setName(profile.full_name)
       setAvatar(profile.avatar_url)
     }
   }, [profile])
+
+  useEffect(() => {
+    checkGitHubStatus()
+  }, [])
+
+  const checkGitHubStatus = async () => {
+    try {
+      const supabase = createClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.access_token) {
+        setGithubLoading(false)
+        return
+      }
+
+      const res = await fetch("/api/github/status", {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`
+        }
+      })
+      if (res.ok) {
+        const data = await res.json()
+        if (data.connected && data.user) {
+          setGithubUser(data.user)
+        } else {
+          setGithubUser(null)
+        }
+      }
+    } catch (err) {
+      console.error("Error checking GitHub status:", err)
+    } finally {
+      setGithubLoading(false)
+    }
+  }
 
   const handleSaveChanges = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -105,7 +141,7 @@ export default function SettingsPage() {
     }
   }
 
-  const isGitHubConnected = profile?.provider === "github"
+  const isGitHubConnected = !!githubUser || profile?.provider === "github"
 
   return (
     <div className="space-y-8 max-w-4xl mx-auto pb-12 animate-in fade-in duration-200">
@@ -207,11 +243,15 @@ export default function SettingsPage() {
             <CardDescription>Connect your GitHub account to enable automatic repository discovery and patch pull requests.</CardDescription>
           </CardHeader>
           <CardContent>
-            {isGitHubConnected ? (
+            {githubLoading ? (
+              <div className="flex items-center gap-2 py-4 text-xs text-muted-foreground">
+                <Loader2 className="size-4 animate-spin text-primary" /> Checking GitHub connection...
+              </div>
+            ) : isGitHubConnected ? (
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between rounded-xl border border-border bg-secondary/10 p-4 gap-4">
                 <div className="flex items-center gap-3.5">
-                  {profile?.avatar_url ? (
-                    <img src={profile.avatar_url} alt="GitHub Avatar" className="size-11 rounded-full border border-border" referrerPolicy="no-referrer" />
+                  {githubUser?.avatar_url || profile?.avatar_url ? (
+                    <img src={githubUser?.avatar_url || profile?.avatar_url} alt="GitHub Avatar" className="size-11 rounded-full border border-border" referrerPolicy="no-referrer" />
                   ) : (
                     <div className="flex size-11 items-center justify-center rounded-full bg-secondary">
                       <GitBranch className="size-5" />
@@ -219,10 +259,12 @@ export default function SettingsPage() {
                   )}
                   <div>
                     <div className="flex items-center gap-2">
-                      <p className="text-xs font-bold text-foreground">Connected as @{profile?.username || "github_user"}</p>
+                      <p className="text-xs font-bold text-foreground">Connected as @{githubUser?.login || profile?.username || "github_user"}</p>
                       <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-full bg-success/15 text-success">Verified</span>
                     </div>
-                    <p className="text-[10px] text-muted-foreground mt-0.5">Authorized for public and private repository syncing.</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">
+                      {githubUser?.public_repos !== undefined ? `${githubUser.public_repos} public repos, ${githubUser.total_private_repos || 0} private repos authorized.` : "Authorized for public and private repository syncing."}
+                    </p>
                   </div>
                 </div>
                 <Button variant="outline" size="sm" className="h-8 text-xs border-destructive/20 hover:bg-destructive/10 hover:text-destructive cursor-pointer" onClick={handleGitHubDisconnect} disabled={loading}>

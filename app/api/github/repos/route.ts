@@ -1,59 +1,80 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { createClient } from "@/lib/supabase/server";
+import { fetchGitHubUserRepos, getStoredGitHubToken, getSupabaseClient, saveStoredGitHubToken, verifyGitHubToken } from "@/lib/services/github";
 
 export async function GET(req: NextRequest) {
   try {
     const authHeader = req.headers.get("authorization");
-    if (!authHeader) {
-      return NextResponse.json({ error: "Missing authorization" }, { status: 401 });
+    let supabase: any;
+
+    if (authHeader) {
+      supabase = getSupabaseClient(authHeader);
+    } else {
+      supabase = await createClient();
     }
 
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co';
-    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key';
-    
-    // We need to bypass RLS to read api_keys if we only have anon key, but we have the user's access token!
-    const supabase = createClient(supabaseUrl, supabaseKey, {
-      global: { headers: { Authorization: authHeader } }
-    });
+    if (!supabase) {
+      return NextResponse.json({ connected: false, error: "Unauthorized", code: "UNAUTHORIZED" }, { status: 401 });
+    }
 
     const { data: { user }, error: userError } = await supabase.auth.getUser();
     if (userError || !user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ connected: false, error: "Unauthorized", code: "UNAUTHORIZED" }, { status: 401 });
     }
 
-    // Get GitHub provider ID
-    const { data: providers } = await supabase.from('providers').select('id').eq('name', 'GitHub').single();
-    if (!providers) {
-      return NextResponse.json({ error: "GitHub provider not found" }, { status: 500 });
+    // 1. Try to get token from DB
+    let token = await getStoredGitHubToken(user.id, supabase);
+
+    // 2. Fallback: check session for provider_token
+    if (!token) {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.provider_token) {
+        token = session.provider_token;
+        await saveStoredGitHubToken(user.id, token, supabase, user.email);
+      }
     }
 
-    // Get user's GitHub API key
-    const { data: apiKey } = await supabase.from('api_keys').select('encrypted_key').eq('user_id', user.id).eq('provider_id', providers.id).single();
-    
-    if (!apiKey?.encrypted_key) {
-      return NextResponse.json({ error: "GitHub not connected" }, { status: 400 });
+    // 3. Fallback: check x-github-token header if provided
+    if (!token) {
+      const customGithubToken = req.headers.get("x-github-token");
+      if (customGithubToken) {
+        token = customGithubToken;
+        await saveStoredGitHubToken(user.id, token, supabase, user.email);
+      }
     }
 
-    const token = apiKey.encrypted_key;
+    if (!token) {
+      return NextResponse.json({
+        connected: false,
+        error: "GitHub account not connected. Please connect your GitHub account in Settings or sign in with GitHub.",
+        code: "NOT_CONNECTED"
+      }, { status: 200 });
+    }
 
-    // Fetch repos from GitHub API
-    const res = await fetch("https://api.github.com/user/repos?per_page=100&sort=updated", {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: "application/vnd.github.v3+json",
-      },
+    // Verify token validity
+    const verification = await verifyGitHubToken(token);
+    if (!verification.valid) {
+      return NextResponse.json({
+        connected: false,
+        error: "GitHub authorization has expired or is invalid. Please reconnect your GitHub account.",
+        code: "EXPIRED_TOKEN"
+      }, { status: 200 });
+    }
+
+    // Fetch real repositories from GitHub API
+    const repos = await fetchGitHubUserRepos(token);
+
+    return NextResponse.json({
+      connected: true,
+      github_user: verification.user,
+      repos
     });
-
-    if (!res.ok) {
-      const errorText = await res.text();
-      console.error("GitHub API error:", errorText);
-      return NextResponse.json({ error: "Failed to fetch repositories from GitHub" }, { status: res.status });
-    }
-
-    const repos = await res.json();
-    return NextResponse.json({ repos });
   } catch (error: any) {
     console.error("Error fetching GitHub repos:", error);
-    return NextResponse.json({ error: error.message || "Internal server error" }, { status: 500 });
+    return NextResponse.json({
+      connected: false,
+      error: error.message || "Failed to fetch repositories from GitHub",
+      code: "GITHUB_API_ERROR"
+    }, { status: 500 });
   }
 }

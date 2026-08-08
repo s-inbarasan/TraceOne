@@ -249,7 +249,21 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
 
           const avatar = dbUserAvatarUrl || githubIdentity?.identity_data?.avatar_url || meta?.avatar_url || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(displayName)}`
 
-          // Ensure it's persisted in public.users table!
+          // If provider_token is present in session, persist it
+          if (session.provider_token) {
+            try {
+              await fetch("/api/github/connect", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${session.access_token}`,
+                },
+                body: JSON.stringify({ provider_token: session.provider_token }),
+              })
+            } catch (err) {
+              console.error("Error persisting provider token from session:", err)
+            }
+          }
           try {
             await supabase.from("users").upsert({
               id: u.id,
@@ -334,105 +348,49 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     setIsSyncingRepos(true)
     try {
       const { data: { session } } = await supabase.auth.getSession()
-      const token = session?.provider_token
+      if (!session?.access_token) {
+        setSyncedRepos([])
+        setIsSyncingRepos(false)
+        return
+      }
 
-      if (token) {
-        // Fetch real repositories from GitHub!
-        const res = await fetch("https://api.github.com/user/repos?sort=updated&per_page=50", {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            Accept: "application/vnd.github+json"
-          }
-        })
-        if (res.ok) {
-          const data = await res.json()
-          const formatted: SyncRepository[] = data.map((r: any) => ({
+      const res = await fetch("/api/github/repos", {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      })
+
+      if (res.ok) {
+        const data = await res.json()
+        if (data.repos) {
+          const formatted: SyncRepository[] = data.repos.map((r: any) => ({
             id: String(r.id),
             name: r.name,
             full_name: r.full_name,
             owner: {
-              login: r.owner.login,
-              avatar_url: r.owner.avatar_url
+              login: r.owner_login || r.owner?.login || "",
+              avatar_url: r.owner_avatar || r.owner?.avatar_url || "",
             },
-            private: r.private,
-            description: r.description,
-            language: r.language,
+            private: !!r.private,
+            description: r.description || null,
+            language: r.language || null,
             default_branch: r.default_branch || "main",
             updated_at: r.updated_at,
-            size: r.size
+            size: r.size || 0,
           }))
           setSyncedRepos(formatted)
           addNotification(
             "GitHub Repositories Synced",
-            `Successfully imported ${formatted.length} repositories from your account.`,
+            `Loaded ${formatted.length} repositories from your GitHub account.`,
             "success"
           )
-          setIsSyncingRepos(false)
-          return
         }
+      } else {
+        setSyncedRepos([])
       }
-
-      // If no token, load beautiful high-fidelity simulated repositories
-      await new Promise(r => setTimeout(r, 1200))
-      const mockRepos: SyncRepository[] = [
-        {
-          id: "r1",
-          name: "api-gateway",
-          full_name: "traceone-labs/api-gateway",
-          owner: { login: "traceone-labs", avatar_url: "https://api.dicebear.com/7.x/identicon/svg?seed=traceone-labs" },
-          private: true,
-          description: "Production gateway proxy built in Next.js & Go handling authentication, tracing, and rate-limiting.",
-          language: "TypeScript",
-          default_branch: "main",
-          updated_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-          size: 14022
-        },
-        {
-          id: "r2",
-          name: "payment-service",
-          full_name: "traceone-labs/payment-service",
-          owner: { login: "traceone-labs", avatar_url: "https://api.dicebear.com/7.x/identicon/svg?seed=traceone-labs" },
-          private: true,
-          description: "Stripe & PayPal microservice backend implementing lazy clients, retry logic, and webhook listeners.",
-          language: "TypeScript",
-          default_branch: "main",
-          updated_at: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
-          size: 8940
-        },
-        {
-          id: "r3",
-          name: "auth-provider",
-          full_name: "personal-space/auth-provider",
-          owner: { login: "personal-space", avatar_url: "https://api.dicebear.com/7.x/identicon/svg?seed=personal-space" },
-          private: false,
-          description: "Open-source JWT authorization helper utility featuring secure cookie configs and sub-claims verification.",
-          language: "TypeScript",
-          default_branch: "master",
-          updated_at: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-          size: 2012
-        },
-        {
-          id: "r4",
-          name: "next-dashboard",
-          full_name: "personal-space/next-dashboard",
-          owner: { login: "personal-space", avatar_url: "https://api.dicebear.com/7.x/identicon/svg?seed=personal-space" },
-          private: false,
-          description: "Stunning React dashboard featuring Tailwind CSS v4, multi-layered layouts, and Recharts animations.",
-          language: "TypeScript",
-          default_branch: "main",
-          updated_at: new Date(Date.now() - 12 * 24 * 60 * 60 * 1000).toISOString(),
-          size: 24500
-        }
-      ]
-      setSyncedRepos(mockRepos)
-      addNotification(
-        "Simulated Repositories Loaded",
-        "No live GitHub connection detected. Loaded default trace-ready sandbox codebases.",
-        "info"
-      )
     } catch (err) {
       console.error("Error syncing repositories:", err)
-      addNotification("Sync Failed", "Could not complete GitHub repository synchronization.", "error")
+      setSyncedRepos([])
     } finally {
       setIsSyncingRepos(false)
     }
