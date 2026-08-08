@@ -170,7 +170,7 @@ export function Sidebar() {
                         : "text-muted-foreground hover:bg-secondary/30 hover:text-foreground"
                     )}
                   >
-                    {proj.source_type === "github" ? (
+                    {(proj.repositories && proj.repositories.length > 0) || proj.slug?.startsWith("github-") || proj.source_type === "github" ? (
                       <GithubIcon className="size-4 shrink-0 text-muted-foreground group-hover:text-foreground" />
                     ) : (
                       <Box className="size-4 shrink-0 text-muted-foreground group-hover:text-foreground" />

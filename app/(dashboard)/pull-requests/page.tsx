@@ -25,11 +25,18 @@ export default function PullRequestsPage() {
         const supabase = createClient();
         const { data, error } = await supabase
           .from("pull_requests")
-          .select("*")
+          .select("*, repositories(full_name), investigations(incidents(id))")
           .order("created_at", { ascending: false });
 
         if (error) throw error;
-        if (data) setPullRequests(data);
+        if (data) {
+          const formatted = data.map(pr => ({
+            ...pr,
+            repository: pr.repositories?.full_name || 'Unknown Repository',
+            incident_id: pr.investigations?.incidents?.id || pr.investigation_id
+          }));
+          setPullRequests(formatted);
+        }
       } catch (err) {
         console.error("Error fetching pull requests:", err);
       } finally {

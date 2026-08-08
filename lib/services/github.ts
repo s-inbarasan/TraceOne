@@ -279,3 +279,80 @@ export async function fetchRepoBranchAndCommit(token: string, fullName: string) 
     throw err;
   }
 }
+
+import { Octokit } from '@octokit/rest';
+
+export async function createGitHubPullRequest(token: string, owner: string, repo: string, branchName: string, title: string, body: string, files: { path: string; content: string }[], baseBranch: string) {
+  const octokit = new Octokit({ auth: token });
+  
+  // 1. Get the latest commit of the base branch
+  const { data: refData } = await octokit.git.getRef({
+    owner,
+    repo,
+    ref: `heads/${baseBranch}`,
+  });
+  const latestCommitSha = refData.object.sha;
+  
+  // 2. Get the base tree
+  const { data: commitData } = await octokit.git.getCommit({
+    owner,
+    repo,
+    commit_sha: latestCommitSha,
+  });
+  const baseTreeSha = commitData.tree.sha;
+  
+  // 3. Create blobs for the files
+  const tree = await Promise.all(
+    files.map(async (file) => {
+      const { data: blobData } = await octokit.git.createBlob({
+        owner,
+        repo,
+        content: file.content,
+        encoding: 'utf-8',
+      });
+      return {
+        path: file.path,
+        mode: '100644' as const,
+        type: 'blob' as const,
+        sha: blobData.sha,
+      };
+    })
+  );
+  
+  // 4. Create a new tree
+  const { data: newTree } = await octokit.git.createTree({
+    owner,
+    repo,
+    base_tree: baseTreeSha,
+    tree,
+  });
+  
+  // 5. Create a new commit
+  const { data: newCommit } = await octokit.git.createCommit({
+    owner,
+    repo,
+    message: title,
+    tree: newTree.sha,
+    parents: [latestCommitSha],
+  });
+  
+  // 6. Create a new branch (ref)
+  await octokit.git.createRef({
+    owner,
+    repo,
+    ref: `refs/heads/${branchName}`,
+    sha: newCommit.sha,
+  });
+  
+  // 7. Create the pull request
+  const { data: prData } = await octokit.pulls.create({
+    owner,
+    repo,
+    title,
+    body,
+    head: branchName,
+    base: baseBranch,
+  });
+  
+  return prData;
+}

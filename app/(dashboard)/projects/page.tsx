@@ -56,13 +56,12 @@ interface RepositoryRecord {
 interface Project {
   id: string;
   name: string;
-  repository: string;
-  source_type: string;
-  status: string;
-  description: string;
+  slug: string;
   created_at: string;
   incidents?: ProjectIncident[];
   repositories?: RepositoryRecord[];
+  repository?: string; // fallback helper
+  status?: string;
 }
 
 interface GitHubRepo {
@@ -228,7 +227,6 @@ function ProjectsContent() {
         body: JSON.stringify({
           name: nameToUse,
           repository: selectedRepo.full_name,
-          description: selectedRepo.description || "",
         }),
       });
 
@@ -268,6 +266,8 @@ function ProjectsContent() {
 
       if (!session?.access_token) return;
 
+      const repoFullName = project.repositories?.[0]?.full_name || project.repository;
+
       const res = await fetch("/api/github/sync", {
         method: "POST",
         headers: {
@@ -276,7 +276,7 @@ function ProjectsContent() {
         },
         body: JSON.stringify({
           project_id: project.id,
-          repository_full_name: project.repository,
+          repository_full_name: repoFullName,
         }),
       });
 
@@ -361,7 +361,7 @@ function ProjectsContent() {
                       <CardTitle className="text-base truncate">{project.name}</CardTitle>
                       <CardDescription className="flex items-center gap-1.5 text-xs">
                         <GitBranch className="size-3.5 shrink-0 text-primary" />
-                        <span className="truncate">{project.repository}</span>
+                        <span className="truncate">{repoData?.full_name || project.repository || project.name}</span>
                       </CardDescription>
                     </div>
                     <div className="flex items-center gap-1.5 shrink-0">
@@ -527,9 +527,10 @@ function ProjectsContent() {
                   <div className="p-1 space-y-1">
                     {filteredRepos.map((repo) => {
                       const isSelected = selectedRepo?.id === repo.id;
-                      const alreadyLinkedProject = projects.find(
-                        (p) => p.repository.toLowerCase() === repo.full_name.toLowerCase()
-                      );
+                      const alreadyLinkedProject = projects.find((p) => {
+                        const linkedName = p.repositories?.[0]?.full_name || p.repository;
+                        return linkedName ? linkedName.toLowerCase() === repo.full_name.toLowerCase() : false;
+                      });
 
                       return (
                         <button

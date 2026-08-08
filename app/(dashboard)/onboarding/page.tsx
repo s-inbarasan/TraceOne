@@ -21,14 +21,22 @@ export default function OnboardingPage() {
   const handleFinish = async () => {
     setLoading(true)
     try {
-      const supabase = createClient()
-      // Insert initial project
       if (projectName && repoName) {
-        await supabase.from("projects").insert({
-          name: projectName,
-          repository: repoName,
-          status: "healthy"
-        })
+        const supabase = createClient()
+        const { data: { session } } = await supabase.auth.getSession()
+        if (session?.access_token) {
+          await fetch("/api/projects", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify({
+              name: projectName,
+              repository: repoName,
+            }),
+          })
+        }
       }
       
       router.push("/dashboard")

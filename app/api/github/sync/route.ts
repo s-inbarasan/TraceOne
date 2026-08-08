@@ -38,19 +38,17 @@ export async function POST(req: NextRequest) {
     let repoFullName = repository_full_name;
     let targetProjectId = project_id;
 
-    // If project_id provided without repoFullName, look up project & repository
+    // If project_id provided without repoFullName, look up linked repository record
     if (project_id && !repoFullName) {
-      const { data: proj } = await supabase
-        .from("projects")
-        .select("id, repository")
-        .eq("id", project_id)
-        .eq("user_id", user.id)
-        .single();
+      const { data: repoRecord } = await supabase
+        .from("repositories")
+        .select("full_name")
+        .eq("project_id", project_id)
+        .maybeSingle();
 
-      if (!proj) {
-        return NextResponse.json({ error: "Project not found" }, { status: 404 });
+      if (repoRecord) {
+        repoFullName = repoRecord.full_name;
       }
-      repoFullName = proj.repository;
     }
 
     if (!repoFullName) {

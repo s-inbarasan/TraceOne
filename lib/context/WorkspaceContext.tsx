@@ -15,14 +15,29 @@ export interface Profile {
   github_id?: string
 }
 
+export interface RepositoryRecord {
+  id: string
+  project_id: string
+  github_id: number
+  full_name: string
+  owner_login?: string
+  repo_name?: string
+  default_branch: string
+  latest_commit_sha?: string
+  latest_commit_message?: string
+  last_synced_at?: string
+  html_url?: string
+}
+
 export interface Project {
   id: string
   name: string
   slug: string
   source_type: "github" | "upload"
-  repository?: string // e.g. "acme-corp/api-gateway"
+  repository?: string // derived helper (e.g. "acme-corp/api-gateway")
   status: "healthy" | "error" | "syncing"
   created_at: string
+  repositories?: RepositoryRecord[]
   files?: Record<string, any>
   logs?: any[]
   model?: string
@@ -289,17 +304,22 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
           setProfile(currentProfile)
 
           // Load database items if any
-          const { data: dbProjects } = await supabase.from("projects").select("*")
+          const { data: dbProjects } = await supabase.from("projects").select("*, repositories(*)")
           if (dbProjects && dbProjects.length > 0) {
-            const mapped: Project[] = dbProjects.map(p => ({
-              id: p.id,
-              name: p.name,
-              slug: p.slug,
-              source_type: p.slug.startsWith("github-") ? "github" : "upload",
-              repository: p.slug.startsWith("github-") ? p.slug.replace("github-", "").replace("-", "/") : undefined,
-              status: "healthy",
-              created_at: p.created_at,
-            }))
+            const mapped: Project[] = dbProjects.map(p => {
+              const repo = p.repositories?.[0]
+              const repoFullName = repo?.full_name || (p.slug.startsWith("github-") ? p.slug.replace("github-", "").replace("-", "/") : undefined)
+              return {
+                id: p.id,
+                name: p.name,
+                slug: p.slug,
+                source_type: "github",
+                repository: repoFullName,
+                repositories: p.repositories || [],
+                status: "healthy",
+                created_at: p.created_at,
+              }
+            })
             // Merge or use DB projects
             setProjects(prev => {
               const prevMap = new Map(prev.map(item => [item.id, item]))
@@ -429,7 +449,23 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
           .select()
           .single()
         
-        if (!error && data) dbProj = data
+        if (!error && data) {
+          dbProj = data
+          if (sourceType === "github" && typeof sourceVal === "string") {
+            const parts = sourceVal.split('/')
+            const repoOwner = parts[0] || 'unknown'
+            const repoNamePart = parts[1] || sourceVal
+            await supabase.from("repositories").insert({
+              project_id: dbProj.id,
+              github_id: Math.floor(Math.random() * 100000000),
+              full_name: sourceVal,
+              owner_login: repoOwner,
+              repo_name: repoNamePart,
+              default_branch: "main",
+              html_url: `https://github.com/${sourceVal}`
+            })
+          }
+        }
       }
 
       // Prepare files structure

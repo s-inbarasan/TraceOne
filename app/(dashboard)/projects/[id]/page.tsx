@@ -116,7 +116,7 @@ export default function ProjectWorkspacePage({ params }: { params: Promise<{ id:
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          prompt: `User query about project ${project?.name} (${project?.repository}):\n${userText}\n\nSelected file: ${selectedFile}\nSelected model: ${selectedModel}`,
+          prompt: `User query about project ${project?.name} (${project?.repositories?.[0]?.full_name || project?.repository}):\n${userText}\n\nSelected file: ${selectedFile}\nSelected model: ${selectedModel}`,
           model: selectedModel,
         })
       })
@@ -173,9 +173,33 @@ export default function ProjectWorkspacePage({ params }: { params: Promise<{ id:
     }
   }
 
-  const handleCreatePullRequest = () => {
-    setPrCreated(true)
-    addNotification("Pull Request Created", `Opened PR #104 in ${project?.repository || "repository"}`, "success")
+  const handleCreatePullRequest = async () => {
+    try {
+      const res = await fetch('/api/github/pull-request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          project_id: project?.id,
+          branch_name: `trace-one/fix-${Date.now()}`,
+          title: 'Fix issue identified by Trace One AI',
+          description: 'This PR fixes the issue found in the analytics controller.',
+          files: [
+            {
+              path: selectedFile || 'src/controllers/analytics.ts',
+              content: patchCode
+            }
+          ]
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to create PR');
+
+      setPrCreated(true);
+      addNotification("Pull Request Created", `Opened PR: ${data.url}`, "success");
+    } catch (err: any) {
+      addNotification("Pull Request Failed", err.message, "error");
+    }
   }
 
   const handleCopyCode = (text: string) => {
@@ -217,7 +241,7 @@ export default function ProjectWorkspacePage({ params }: { params: Promise<{ id:
             </div>
             <p className="text-xs text-muted-foreground flex items-center gap-1.5 mt-0.5">
               <GitBranch className="size-3.5" />
-              {project.repository || "Local Repository"}
+              {project.repositories?.[0]?.full_name || project.repository || "Local Repository"}
             </p>
           </div>
         </div>

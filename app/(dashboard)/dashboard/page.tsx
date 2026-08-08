@@ -199,7 +199,7 @@ export default function Dashboard() {
                         <div className="min-w-0">
                           <p className="text-xs font-semibold text-foreground truncate group-hover:text-primary transition-colors">{proj.name}</p>
                           <p className="text-[9px] text-muted-foreground truncate font-mono mt-0.5">
-                            {proj.source_type === "github" ? proj.repository : "Uploaded Local Directory"}
+                            {proj.source_type === "github" ? (proj.repositories?.[0]?.full_name || proj.repository) : "Uploaded Local Directory"}
                           </p>
                         </div>
                       </div>

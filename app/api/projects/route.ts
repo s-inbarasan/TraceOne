@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
     if (!body.name || !body.repository) {
       return NextResponse.json({ error: 'Project name and repository are required' }, { status: 400 });
     }
-    const project = await createProject({ name: body.name, repository: body.repository, description: body.description });
+    const project = await createProject({ name: body.name, repository: body.repository });
     return NextResponse.json({ success: true, data: project }, { status: 201 });
   } catch (error: any) {
     console.error('API /api/projects POST error:', error);

@@ -24,7 +24,7 @@ export async function getProjects() {
   }
 }
 
-export async function createProject(projectData: { name: string; repository: string; description?: string }) {
+export async function createProject(projectData: { name: string; repository: string }) {
   try {
     const supabase = await createClient();
     const { data: { user }, error: userError } = await supabase.auth.getUser();
@@ -33,28 +33,32 @@ export async function createProject(projectData: { name: string; repository: str
       throw new Error('You must be logged in to create a project');
     }
 
-    const { data: existingProjects } = await supabase
-      .from('projects')
-      .select('id, name')
-      .eq('user_id', user.id)
-      .eq('repository', projectData.repository);
+    const repositoryFullName = projectData.repository.trim();
 
-    if (existingProjects && existingProjects.length > 0) {
-      throw new Error(`This repository (${projectData.repository}) is already linked to project "${existingProjects[0].name}".`);
+    // 1. Check if user already has a project linked to this repository in repositories table
+    const { data: existingRepo } = await supabase
+      .from('repositories')
+      .select('id, project_id, full_name, projects!inner(id, name, user_id)')
+      .eq('full_name', repositoryFullName)
+      .eq('projects.user_id', user.id)
+      .maybeSingle();
+
+    if (existingRepo && (existingRepo as any).projects) {
+      const projName = (existingRepo as any).projects.name;
+      throw new Error(`This repository (${repositoryFullName}) is already linked to project "${projName}".`);
     }
 
-    const slug = `github-${projectData.repository.replace('/', '-').toLowerCase()}`;
+    // 2. Generate clean unique slug
+    const cleanRepoSlug = repositoryFullName.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase();
+    const slug = `github-${cleanRepoSlug}-${Date.now().toString(36)}`;
 
+    // 3. Insert project record with ONLY valid projects columns: user_id, name, slug
     const { data: project, error: projError } = await supabase
       .from('projects')
       .insert({
         user_id: user.id,
         name: projectData.name,
         slug,
-        repository: projectData.repository,
-        source_type: 'github',
-        status: 'healthy',
-        description: projectData.description || '',
       })
       .select()
       .single();
@@ -63,43 +67,69 @@ export async function createProject(projectData: { name: string; repository: str
       throw new Error(projError?.message || 'Failed to create project in database');
     }
 
+    // 4. Fetch repo branch and commit details if token is available
+    let repoInfo: any = null;
     try {
       const token = await getStoredGitHubToken(user.id, supabase);
       if (token) {
-        const repoInfo = await fetchRepoBranchAndCommit(token, projectData.repository);
-        if (repoInfo) {
-          await supabase.from('repositories').upsert(
-            {
-              project_id: project.id,
-              github_id: repoInfo.github_id,
-              full_name: repoInfo.full_name,
-              owner_login: repoInfo.owner_login,
-              repo_name: repoInfo.repo_name,
-              default_branch: repoInfo.default_branch,
-              latest_commit_sha: repoInfo.latest_commit_sha,
-              latest_commit_message: repoInfo.latest_commit_message,
-              last_synced_at: new Date().toISOString(),
-              html_url: repoInfo.html_url,
-            },
-            { onConflict: 'project_id, github_id' }
-          );
-        }
+        repoInfo = await fetchRepoBranchAndCommit(token, repositoryFullName);
       }
     } catch (syncErr) {
       console.warn('Non-blocking error during initial repo sync:', syncErr);
     }
 
-    return project;
+    const parts = repositoryFullName.split('/');
+    const ownerLogin = repoInfo?.owner_login || parts[0] || 'unknown';
+    const repoNamePart = repoInfo?.repo_name || parts[1] || repositoryFullName;
+    const githubId = repoInfo?.github_id || Math.floor(Math.random() * 100000000);
+
+    // 5. Create linked repository record
+    const { data: repoRecord, error: repoInsertErr } = await supabase
+      .from('repositories')
+      .insert({
+        project_id: project.id,
+        github_id: githubId,
+        full_name: repoInfo?.full_name || repositoryFullName,
+        owner_login: ownerLogin,
+        repo_name: repoNamePart,
+        default_branch: repoInfo?.default_branch || 'main',
+        latest_commit_sha: repoInfo?.latest_commit_sha || null,
+        latest_commit_message: repoInfo?.latest_commit_message || null,
+        last_synced_at: repoInfo ? new Date().toISOString() : null,
+        html_url: repoInfo?.html_url || `https://github.com/${repositoryFullName}`,
+      })
+      .select()
+      .single();
+
+    if (repoInsertErr) {
+      console.error('Error inserting repository record:', repoInsertErr);
+    }
+
+    return {
+      ...project,
+      repositories: repoRecord ? [repoRecord] : [],
+    };
   } catch (err) {
     console.error('Error creating project:', err);
     throw err;
   }
 }
 
-export async function updateProject(id: string, updates: Record<string, any>) {
+export async function updateProject(id: string, updates: { name?: string }) {
   try {
     const supabase = await createClient();
-    const { data, error } = await supabase.from('projects').update(updates).eq('id', id).select().single();
+    const allowedUpdates: Record<string, any> = {
+      updated_at: new Date().toISOString(),
+    };
+    if (updates.name) allowedUpdates.name = updates.name;
+
+    const { data, error } = await supabase
+      .from('projects')
+      .update(allowedUpdates)
+      .eq('id', id)
+      .select('*, repositories(*)')
+      .single();
+
     if (error) throw error;
     return data;
   } catch (err) {
