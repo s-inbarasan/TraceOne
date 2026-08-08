@@ -1,7 +1,7 @@
 "use client"
 
 import { use, useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { useWorkspace, Project, Message } from "@/lib/context/WorkspaceContext"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -34,25 +34,26 @@ import {
 } from "lucide-react"
 import { GithubIcon } from "@/components/ui/icons"
 import Link from "next/link"
+import { GeminiLogo, OpenAILogo, AnthropicLogo, NvidiaLogo, GroqLogo } from "@/components/ui/ai-logos"
 
 function getModelProviderIcon(modelName: string) {
   const model = modelName.toLowerCase();
   if (model.includes('gemini')) {
-    return <Sparkles className="size-3 text-blue-500" />
+    return <GeminiLogo className="size-3.5" />
   }
   if (model.includes('gpt') || model.includes('openai')) {
-    return <Bot className="size-3 text-emerald-500" />
+    return <OpenAILogo className="size-3.5 text-emerald-500" />
   }
   if (model.includes('claude') || model.includes('anthropic')) {
-    return <Brain className="size-3 text-amber-500" />
+    return <AnthropicLogo className="size-3.5 text-amber-500" />
   }
   if (model.includes('nvidia') || model.includes('llama-3.1-405b')) {
-    return <Cpu className="size-3 text-green-500" />
+    return <NvidiaLogo className="size-3.5 text-green-500" />
   }
   if (model.includes('groq') || model.includes('70b-versatile')) {
-    return <Zap className="size-3 text-red-500" />
+    return <GroqLogo className="size-3.5 text-red-500" />
   }
-  return <Bot className="size-3 text-muted-foreground" />
+  return <Bot className="size-3.5 text-muted-foreground" />
 }
 
 export default function ProjectWorkspacePage({ params }: { params: Promise<{ id: string }> }) {
@@ -89,6 +90,39 @@ export default function ProjectWorkspacePage({ params }: { params: Promise<{ id:
   const [filePaths, setFilePaths] = useState<string[]>([])
   const [fileContents, setFileContents] = useState<Record<string, string>>({})
   const [loadingFiles, setLoadingFiles] = useState(false)
+
+  const searchParams = useSearchParams()
+  const incidentIdParam = searchParams.get("incident")
+  const [activeIncident, setActiveIncident] = useState<{
+    id: string
+    title: string
+    severity: string
+    status: string
+    service: string
+    file_path: string
+    stack_trace: string
+    event_count: number
+    created_at: string
+  } | null>(null)
+
+  useEffect(() => {
+    if (!incidentIdParam) return;
+    const fetchIncident = async () => {
+      try {
+        const res = await fetch(`/api/incidents/${incidentIdParam}`)
+        const data = await res.json()
+        if (data.success && data.data) {
+          setActiveIncident(data.data)
+          if (data.data.file_path) {
+            setSelectedFile(data.data.file_path)
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch incident details", err)
+      }
+    }
+    fetchIncident()
+  }, [incidentIdParam])
 
   // Load repository files dynamically
   useEffect(() => {
@@ -159,22 +193,13 @@ export default function ProjectWorkspacePage({ params }: { params: Promise<{ id:
           const configured = data.providers.filter((p: any) => configuredProviderIds.includes(p.id))
           setConfiguredProviders(configured)
           
-          if (configured.length > 0 && (!selectedModel || !configured.some((p: any) => {
-            const name = p.name.toLowerCase();
-            const sm = selectedModel.toLowerCase();
-            return sm.includes(name) || (name === 'gemini' && sm.includes('gemini')) || (name === 'openai' && sm.includes('gpt')) || (name === 'anthropic' && sm.includes('claude')) || (name === 'groq' && sm.includes('groq')) || (name === 'nvidia' && sm.includes('nvidia'));
-          }))) {
-            // Pick default based on configured
-            if (configured.some((p: any) => p.name.toLowerCase() === 'gemini')) {
-              setSelectedModel('gemini-2.5-flash')
-            } else if (configured.some((p: any) => p.name.toLowerCase() === 'openai')) {
-              setSelectedModel('gpt-4o-mini')
-            } else if (configured.some((p: any) => p.name.toLowerCase() === 'anthropic')) {
-              setSelectedModel('claude-3-5-sonnet')
-            } else if (configured.some((p: any) => p.name.toLowerCase() === 'nvidia')) {
-              setSelectedModel('meta/llama-3.1-405b-instruct')
-            } else if (configured.some((p: any) => p.name.toLowerCase() === 'groq')) {
-              setSelectedModel('llama-3.1-70b-versatile')
+          if (configured.length > 0 && (!selectedModel || !configured.some((p: any) => p.name.toLowerCase() === selectedModel.toLowerCase()))) {
+            // Pick default based on first configured provider
+            const geminiFirst = configured.find((p: any) => p.name.toLowerCase() === 'gemini')
+            if (geminiFirst) {
+              setSelectedModel(geminiFirst.name)
+            } else {
+              setSelectedModel(configured[0].name)
             }
           }
         }
@@ -229,6 +254,49 @@ export default function ProjectWorkspacePage({ params }: { params: Promise<{ id:
     }
   ]
 
+  const buildPromptContext = (userText: string) => {
+    let context = `Project: ${project?.name || "Acme Service"}\n`
+    if (project?.repository) {
+      context += `Repository: ${project.repository}\n`
+    }
+    if (activeIncident) {
+      context += `\n--- INCIDENT ERROR DETAILS ---\n`
+      context += `Title/Message: ${activeIncident.title}\n`
+      context += `Severity: ${activeIncident.severity}\n`
+      context += `Affected File Path: ${activeIncident.file_path}\n`
+      if (activeIncident.stack_trace) {
+        context += `Stack Trace:\n${activeIncident.stack_trace}\n`
+      }
+      context += `-------------------------------\n`
+    }
+    
+    const latestFilesMap: Record<string, string> = {
+      ...fileContents,
+      "package.json": fileContents["package.json"] || "",
+      "src/controllers/analytics.ts": fileContents["src/controllers/analytics.ts"] || "",
+      "src/services/analytics.ts": fileContents["src/services/analytics.ts"] || ""
+    };
+
+    context += `\n--- TARGET RESOLUTION FILE ---\n`
+    context += `Path: ${selectedFile}\n`
+    context += `Content:\n${latestFilesMap[selectedFile] || "// (Content empty or loading)"}\n`
+    context += `-------------------------------\n`
+    
+    // Include other files loaded in state for multi-file reasoning
+    const otherFiles = Object.keys(fileContents).filter(f => f !== selectedFile && fileContents[f]);
+    if (otherFiles.length > 0) {
+      context += `\n--- OTHER RELEVANT FILES IN REPOSITORY ---\n`
+      otherFiles.forEach(f => {
+        context += `File: ${f}\n`
+        context += `Content:\n${fileContents[f]}\n`
+        context += `------------------------------------\n`
+      })
+    }
+    
+    context += `\nUser Query/Action Requested: ${userText}`
+    return context
+  }
+
   const handleSendMessage = async (e?: React.FormEvent) => {
     if (e) e.preventDefault()
     if (!promptInput.trim() || isGenerating) return
@@ -238,13 +306,7 @@ export default function ProjectWorkspacePage({ params }: { params: Promise<{ id:
     setIsGenerating(true)
     
     try {
-      const fileContext = filesMap[selectedFile] || ""
-      const promptContext = `Project: ${project?.name}
-Selected File: ${selectedFile}
-Code:
-${fileContext}
-
-User Query: ${userText}`
+      const promptContext = buildPromptContext(userText)
 
       const res = await fetch("/api/ai", {
         method: "POST",
@@ -302,7 +364,11 @@ User Query: ${userText}`
                 file_path: parsedPatch.filePath || selectedFile,
                 original_content: parsedPatch.original,
                 updated_content: parsedPatch.modified,
-                model: selectedModel
+                model: selectedModel,
+                root_cause: parsedPatch.rootCause || null,
+                confidence_score: parsedPatch.confidenceScore || null,
+                risk_analysis: parsedPatch.riskAnalysis || null,
+                time_estimate_minutes: parsedPatch.timeEstimateMinutes || null
              })
            }).then(res => res.json()).then(data => {
               if (data.error) console.error("Patch store error:", data.error)
@@ -324,13 +390,7 @@ User Query: ${userText}`
     const userText = "Run automatic root cause investigation and generate a deployable code patch."
     addChatMessage(projectId, "user", userText)
     try {
-      const fileContext = filesMap[selectedFile] || ""
-      const promptContext = `Project: ${project?.name}
-Selected File: ${selectedFile}
-Code:
-${fileContext}
-
-User Query: ${userText}`
+      const promptContext = buildPromptContext(userText)
 
       const res = await fetch("/api/ai", {
         method: "POST",
@@ -387,7 +447,11 @@ User Query: ${userText}`
                 file_path: parsedPatch.filePath || selectedFile,
                 original_content: parsedPatch.original,
                 updated_content: parsedPatch.modified,
-                model: selectedModel
+                model: selectedModel,
+                root_cause: parsedPatch.rootCause || null,
+                confidence_score: parsedPatch.confidenceScore || null,
+                risk_analysis: parsedPatch.riskAnalysis || null,
+                time_estimate_minutes: parsedPatch.timeEstimateMinutes || null
              })
            }).then(res => res.json()).then(data => {
               if (data.error) console.error("Patch store error:", data.error)
@@ -521,6 +585,21 @@ User Query: ${userText}`
         </div>
       </div>
 
+      {activeIncident && (
+        <div className="flex items-center justify-between p-3.5 rounded-lg border border-destructive/20 bg-destructive/5 text-destructive gap-3 text-xs animate-in slide-in-from-top-4 duration-300">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="size-4 text-destructive shrink-0" />
+            <div>
+              <span className="font-semibold text-foreground">Resolving Incident:</span>{" "}
+              <span className="font-mono text-muted-foreground">{activeIncident.title}</span>
+            </div>
+          </div>
+          <Badge variant="destructive" className="uppercase text-[9px] shrink-0">
+            {activeIncident.severity}
+          </Badge>
+        </div>
+      )}
+
       {/* Main Grid Workspace */}
       <div className="grid gap-6 lg:grid-cols-12 min-h-[600px]">
         
@@ -578,9 +657,9 @@ User Query: ${userText}`
                 <div className="flex items-center justify-between text-[10px] font-semibold text-muted-foreground uppercase pb-1">
                   <span>Model Provider</span>
                   {selectedModel && (
-                    <div className="flex items-center gap-1 font-mono text-[9px] uppercase font-bold text-foreground bg-secondary px-1.5 py-0.5 rounded">
+                    <div className="flex items-center gap-1 font-semibold text-[10px] text-foreground bg-secondary px-1.5 py-0.5 rounded">
                       {getModelProviderIcon(selectedModel)}
-                      <span>{selectedModel.split('-')[0]}</span>
+                      <span>{selectedModel === 'Gemini' ? 'Google Gemini' : selectedModel}</span>
                     </div>
                   )}
                 </div>
@@ -599,27 +678,11 @@ User Query: ${userText}`
                     disabled={!keysLoaded}
                   >
                     {!keysLoaded && <option>Loading...</option>}
-                    {configuredProviders.some(p => p.name.toLowerCase() === 'gemini') && (
-                      <>
-                        <option value="gemini-2.5-flash">Google Gemini 2.5 Flash</option>
-                        <option value="gemini-2.5-pro">Google Gemini 2.5 Pro</option>
-                      </>
-                    )}
-                    {configuredProviders.some(p => p.name.toLowerCase() === 'openai') && (
-                      <>
-                        <option value="gpt-4o">OpenAI GPT-4o</option>
-                        <option value="gpt-4o-mini">OpenAI GPT-4o Mini</option>
-                      </>
-                    )}
-                    {configuredProviders.some(p => p.name.toLowerCase() === 'anthropic') && (
-                        <option value="claude-3-5-sonnet">Anthropic Claude 3.5 Sonnet</option>
-                    )}
-                    {configuredProviders.some(p => p.name.toLowerCase() === 'nvidia') && (
-                        <option value="meta/llama-3.1-405b-instruct">NVIDIA Llama 3.1 405B</option>
-                    )}
-                    {configuredProviders.some(p => p.name.toLowerCase() === 'groq') && (
-                        <option value="llama-3.1-70b-versatile">Groq Llama 3.1 70B</option>
-                    )}
+                    {configuredProviders.map((p: any) => (
+                      <option key={p.id} value={p.name}>
+                        {p.name === 'Gemini' ? 'Google Gemini' : p.name}
+                      </option>
+                    ))}
                   </select>
                 )}
               </div>

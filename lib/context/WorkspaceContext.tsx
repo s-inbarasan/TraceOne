@@ -147,7 +147,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   const [apiKeys, setApiKeys] = useState<Record<string, ApiKey>>({})
   const [notifications, setNotifications] = useState<NotificationItem[]>([])
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
-  const [selectedModel, setSelectedModel] = useState("gemini-2.5-flash")
+  const [selectedModel, setSelectedModel] = useState("Gemini")
   const [chatHistory, setChatHistory] = useState<Record<string, Message[]>>({})
   const [activeFile, setActiveFile] = useState<string | null>(null)
   const [currentDiff, setCurrentDiff] = useState<any | null>(null)
@@ -544,7 +544,7 @@ export async function getAnalytics(req: any, res: any) {
         created_at: new Date().toISOString(),
         files: projectFiles,
         logs: defaultLogs,
-        model: "gemini-2.5-flash"
+        model: "Gemini"
       }
 
       setProjects(prev => [newProj, ...prev])

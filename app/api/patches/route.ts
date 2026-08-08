@@ -11,7 +11,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { project_id, repository_id, file_path, original_content, updated_content, model } = await req.json();
+    const { 
+      project_id, 
+      repository_id, 
+      file_path, 
+      original_content, 
+      updated_content, 
+      model,
+      root_cause,
+      confidence_score,
+      risk_analysis,
+      time_estimate_minutes
+    } = await req.json();
 
     if (!project_id || !repository_id) {
        return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
@@ -57,14 +68,42 @@ export async function POST(req: NextRequest) {
         .from('investigations')
         .insert({
            incident_id: incident.id,
-           status: 'completed'
+           status: 'completed',
+           root_cause: root_cause || null,
+           confidence_score: confidence_score || null,
+           risk_analysis: risk_analysis || null,
+           time_estimate_minutes: time_estimate_minutes || null
         })
         .select('id')
         .single();
         
       if (invErr) throw invErr;
       investigation = newInv;
+    } else {
+      // Update existing investigation with diagnostics if provided
+      const updateData: any = {};
+      if (root_cause) updateData.root_cause = root_cause;
+      if (confidence_score) updateData.confidence_score = confidence_score;
+      if (risk_analysis) updateData.risk_analysis = risk_analysis;
+      if (time_estimate_minutes) updateData.time_estimate_minutes = time_estimate_minutes;
+      updateData.status = 'completed';
+
+      if (Object.keys(updateData).length > 0) {
+        await supabase
+          .from('investigations')
+          .update(updateData)
+          .eq('id', investigation.id);
+      }
     }
+
+    // Create a record in analysis_runs
+    await supabase.from('analysis_runs').insert({
+      investigation_id: investigation.id,
+      step_name: 'AI Analysis',
+      output: root_cause || `AI Analysis of ${file_path}`,
+      status: 'success',
+      completed_at: new Date().toISOString()
+    });
 
     const actualDiff = generateUnifiedDiff(file_path, original_content, updated_content);
 

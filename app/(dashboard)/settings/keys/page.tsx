@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input"
 import { Key, Eye, EyeOff, Plus, Trash2, CheckCircle2, AlertCircle, RefreshCw, Loader2, Bot, Sparkles, Brain, Cpu, Zap } from "lucide-react"
 import { useState, useEffect } from "react"
 import { Badge } from "@/components/ui/badge"
+import { GeminiLogo, OpenAILogo, AnthropicLogo, NvidiaLogo, GroqLogo } from "@/components/ui/ai-logos"
 
 export default function ApiKeysPage() {
   const [showKey, setShowKey] = useState<Record<string, boolean>>({})
@@ -15,6 +16,7 @@ export default function ApiKeysPage() {
   const [editing, setEditing] = useState<Record<string, boolean>>({})
   const [newKeyValues, setNewKeyValues] = useState<Record<string, string>>({})
   const [validating, setValidating] = useState<Record<string, boolean>>({})
+  const [errorMessages, setErrorMessages] = useState<Record<string, string>>({})
 
   const fetchKeysAndProviders = async () => {
     try {
@@ -50,6 +52,7 @@ export default function ApiKeysPage() {
 
   const handleSaveKey = async (providerId: string) => {
     setValidating(prev => ({ ...prev, [providerId]: true }))
+    setErrorMessages(prev => ({ ...prev, [providerId]: '' }))
     try {
       const val = newKeyValues[providerId]
       if (!val) return
@@ -61,13 +64,16 @@ export default function ApiKeysPage() {
       })
       const data = await res.json()
 
-      if (!res.ok || !data.success) throw new Error(data.error || "Failed to save")
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Failed to save API key. Please check your key configuration.")
+      }
       
       await fetchKeysAndProviders()
       setEditing(prev => ({ ...prev, [providerId]: false }))
       setNewKeyValues(prev => ({ ...prev, [providerId]: '' }))
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to save key", err)
+      setErrorMessages(prev => ({ ...prev, [providerId]: err.message || "Failed to save key" }))
     } finally {
       setValidating(prev => ({ ...prev, [providerId]: false }))
     }
@@ -112,11 +118,11 @@ export default function ApiKeysPage() {
               <CardHeader className="flex flex-row items-center justify-between pb-4">
                 <div className="space-y-1">
                   <CardTitle className="text-base flex items-center gap-2">
-                    {provider.name.toLowerCase().includes('gemini') && <div className="size-5 rounded-full bg-blue-500/10 text-blue-500 flex items-center justify-center"><Sparkles className="size-3" /></div>}
-                    {provider.name.toLowerCase().includes('openai') && <div className="size-5 rounded-full bg-emerald-500/10 text-emerald-500 flex items-center justify-center"><Bot className="size-3" /></div>}
-                    {provider.name.toLowerCase().includes('anthropic') && <div className="size-5 rounded-full bg-amber-500/10 text-amber-500 flex items-center justify-center"><Brain className="size-3" /></div>}
-                    {provider.name.toLowerCase().includes('nvidia') && <div className="size-5 rounded-full bg-green-500/10 text-green-500 flex items-center justify-center"><Cpu className="size-3" /></div>}
-                    {provider.name.toLowerCase().includes('groq') && <div className="size-5 rounded-full bg-red-500/10 text-red-500 flex items-center justify-center"><Zap className="size-3" /></div>}
+                    {provider.name.toLowerCase().includes('gemini') && <div className="size-5 rounded-full bg-blue-500/10 flex items-center justify-center"><GeminiLogo className="size-3.5" /></div>}
+                    {provider.name.toLowerCase().includes('openai') && <div className="size-5 rounded-full bg-emerald-500/10 text-emerald-500 flex items-center justify-center"><OpenAILogo className="size-3.5" /></div>}
+                    {provider.name.toLowerCase().includes('anthropic') && <div className="size-5 rounded-full bg-amber-500/10 text-amber-500 flex items-center justify-center"><AnthropicLogo className="size-3.5" /></div>}
+                    {provider.name.toLowerCase().includes('nvidia') && <div className="size-5 rounded-full bg-green-500/10 text-green-500 flex items-center justify-center"><NvidiaLogo className="size-3.5" /></div>}
+                    {provider.name.toLowerCase().includes('groq') && <div className="size-5 rounded-full bg-red-500/10 text-red-500 flex items-center justify-center"><GroqLogo className="size-3.5" /></div>}
                     {provider.name}
                     {isConfigured ? (
                       <Badge variant="default" className="text-[10px] h-5 px-1.5 flex items-center gap-1 bg-green-500/10 text-green-500 hover:bg-green-500/20 border-green-500/20">
@@ -185,6 +191,12 @@ export default function ApiKeysPage() {
                           Save
                         </Button>
                       </div>
+                      {errorMessages[provider.id] && (
+                        <div className="text-sm text-red-500 font-medium flex items-start gap-1.5 bg-red-500/10 border border-red-500/20 p-2 rounded-md">
+                          <AlertCircle className="size-4 mt-0.5 shrink-0" />
+                          <span>{errorMessages[provider.id]}</span>
+                        </div>
+                      )}
                       <div className="text-xs text-muted-foreground flex items-center gap-1.5">
                         <AlertCircle className="size-3.5" /> 
                         Keys are securely stored and never exposed in the browser.
