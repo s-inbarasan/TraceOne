@@ -27,10 +27,33 @@ import {
   Code2,
   Layers,
   ChevronRight,
-  ChevronDown
+  ChevronDown,
+  Brain,
+  Cpu,
+  Zap
 } from "lucide-react"
 import { GithubIcon } from "@/components/ui/icons"
 import Link from "next/link"
+
+function getModelProviderIcon(modelName: string) {
+  const model = modelName.toLowerCase();
+  if (model.includes('gemini')) {
+    return <Sparkles className="size-3 text-blue-500" />
+  }
+  if (model.includes('gpt') || model.includes('openai')) {
+    return <Bot className="size-3 text-emerald-500" />
+  }
+  if (model.includes('claude') || model.includes('anthropic')) {
+    return <Brain className="size-3 text-amber-500" />
+  }
+  if (model.includes('nvidia') || model.includes('llama-3.1-405b')) {
+    return <Cpu className="size-3 text-green-500" />
+  }
+  if (model.includes('groq') || model.includes('70b-versatile')) {
+    return <Zap className="size-3 text-red-500" />
+  }
+  return <Bot className="size-3 text-muted-foreground" />
+}
 
 export default function ProjectWorkspacePage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params)
@@ -60,6 +83,110 @@ export default function ProjectWorkspacePage({ params }: { params: Promise<{ id:
   } | null>(null)
   const [copied, setCopied] = useState(false)
   const [prCreated, setPrCreated] = useState(false)
+  const [configuredProviders, setConfiguredProviders] = useState<any[]>([])
+  const [keysLoaded, setKeysLoaded] = useState(false)
+
+  const [filePaths, setFilePaths] = useState<string[]>([])
+  const [fileContents, setFileContents] = useState<Record<string, string>>({})
+  const [loadingFiles, setLoadingFiles] = useState(false)
+
+  // Load repository files dynamically
+  useEffect(() => {
+    if (!project) return;
+    if (project.source_type !== "github") {
+      const fallbackFiles = ["package.json", "src/controllers/analytics.ts", "src/services/analytics.ts"];
+      setFilePaths(fallbackFiles);
+      setFileContents({
+        "package.json": `{\n  "name": "${project.name.toLowerCase().replace(/\s+/g, "-")}",\n  "version": "1.0.0"\n}`,
+        "src/controllers/analytics.ts": `import { AnalyticsService } from "../services/analytics";\nimport { formatMetric } from "../utils/formatter";\n\nexport async function getAnalytics(req: any, res: any) {\n  const userId = req.user.id;\n  const rawMetrics = await AnalyticsService.getMetrics(userId);\n  const formatted = rawMetrics.map((m: any) => formatMetric(m));\n  return res.json({ data: formatted });\n}`,
+        "src/services/analytics.ts": `export class AnalyticsService {\n  static async getMetrics(userId: string) {\n    return null;\n  }\n}`
+      });
+      setSelectedFile("src/controllers/analytics.ts");
+      return;
+    }
+
+    const fetchFilesList = async () => {
+      setLoadingFiles(true);
+      try {
+        const res = await fetch(`/api/github/files?project_id=${project.id}`);
+        const data = await res.json();
+        if (data.success && data.files && data.files.length > 0) {
+          setFilePaths(data.files);
+          const firstFile = data.files.find((f: string) => f.includes("analytics.ts")) || data.files[0];
+          setSelectedFile(firstFile);
+        } else {
+          setFilePaths(["package.json", "src/controllers/analytics.ts", "src/services/analytics.ts"]);
+        }
+      } catch (err) {
+        console.error("Failed to load GitHub files:", err);
+        setFilePaths(["package.json", "src/controllers/analytics.ts", "src/services/analytics.ts"]);
+      } finally {
+        setLoadingFiles(false);
+      }
+    };
+
+    fetchFilesList();
+  }, [project?.id, project?.source_type]);
+
+  // Load content of selected file dynamically
+  useEffect(() => {
+    if (!project || !selectedFile) return;
+    if (project.source_type !== "github") return;
+    if (fileContents[selectedFile]) return;
+
+    const fetchFileContent = async () => {
+      try {
+        const res = await fetch(`/api/github/file-content?project_id=${project.id}&path=${encodeURIComponent(selectedFile)}`);
+        const data = await res.json();
+        if (data.success) {
+          setFileContents((prev) => ({ ...prev, [selectedFile]: data.content }));
+        }
+      } catch (err) {
+        console.error("Failed to load file content:", err);
+      }
+    };
+
+    fetchFileContent();
+  }, [selectedFile, project?.id, project?.source_type]);
+
+  useEffect(() => {
+    const fetchKeys = async () => {
+      try {
+        const res = await fetch('/api/keys')
+        const data = await res.json()
+        if (data.success && data.keys) {
+          const configuredProviderIds = data.keys.map((k: any) => k.provider_id)
+          const configured = data.providers.filter((p: any) => configuredProviderIds.includes(p.id))
+          setConfiguredProviders(configured)
+          
+          if (configured.length > 0 && (!selectedModel || !configured.some((p: any) => {
+            const name = p.name.toLowerCase();
+            const sm = selectedModel.toLowerCase();
+            return sm.includes(name) || (name === 'gemini' && sm.includes('gemini')) || (name === 'openai' && sm.includes('gpt')) || (name === 'anthropic' && sm.includes('claude')) || (name === 'groq' && sm.includes('groq')) || (name === 'nvidia' && sm.includes('nvidia'));
+          }))) {
+            // Pick default based on configured
+            if (configured.some((p: any) => p.name.toLowerCase() === 'gemini')) {
+              setSelectedModel('gemini-2.5-flash')
+            } else if (configured.some((p: any) => p.name.toLowerCase() === 'openai')) {
+              setSelectedModel('gpt-4o-mini')
+            } else if (configured.some((p: any) => p.name.toLowerCase() === 'anthropic')) {
+              setSelectedModel('claude-3-5-sonnet')
+            } else if (configured.some((p: any) => p.name.toLowerCase() === 'nvidia')) {
+              setSelectedModel('meta/llama-3.1-405b-instruct')
+            } else if (configured.some((p: any) => p.name.toLowerCase() === 'groq')) {
+              setSelectedModel('llama-3.1-70b-versatile')
+            }
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch keys", err)
+      } finally {
+        setKeysLoaded(true)
+      }
+    }
+    fetchKeys()
+  }, [])
+
 
   // Find project
   useEffect(() => {
@@ -105,69 +232,181 @@ export default function ProjectWorkspacePage({ params }: { params: Promise<{ id:
   const handleSendMessage = async (e?: React.FormEvent) => {
     if (e) e.preventDefault()
     if (!promptInput.trim() || isGenerating) return
-
     const userText = promptInput.trim()
     setPromptInput("")
     addChatMessage(projectId, "user", userText)
     setIsGenerating(true)
-
+    
     try {
-      const res = await fetch("/api/gemini", {
+      const fileContext = filesMap[selectedFile] || ""
+      const promptContext = `Project: ${project?.name}
+Selected File: ${selectedFile}
+Code:
+${fileContext}
+
+User Query: ${userText}`
+
+      const res = await fetch("/api/ai", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          prompt: `User query about project ${project?.name} (${project?.repositories?.[0]?.full_name || project?.repository}):\n${userText}\n\nSelected file: ${selectedFile}\nSelected model: ${selectedModel}`,
+          prompt: promptContext,
           model: selectedModel,
         })
       })
-
+      
       const data = await res.json()
-      const aiResponse = data.text || "Analyzed codebase context. No further syntax issues detected."
+      
+      if (!res.ok) {
+        addChatMessage(projectId, "assistant", `Error: ${data.error || 'Failed to communicate with AI provider.'}`)
+        setIsGenerating(false)
+        return
+      }
+
+      let aiResponse = data.text || ""
+      
+      // Try to parse JSON block
+      const jsonMatch = aiResponse.match(/```json\s*(\{[\s\S]*?\})\s*```/)
+      let parsedPatch = null
+      
+      if (jsonMatch) {
+        try {
+          parsedPatch = JSON.parse(jsonMatch[1])
+          aiResponse = aiResponse.replace(jsonMatch[0], "").trim() // Remove JSON block from visual response
+        } catch (e) {
+          console.error("Failed to parse AI patch JSON", e)
+        }
+      }
+
+      if (!aiResponse) {
+         aiResponse = "I have analyzed the code and prepared a patch."
+      }
       
       addChatMessage(projectId, "assistant", aiResponse)
 
-      // If response mentions fix, set draft diff
-      if (aiResponse.toLowerCase().includes("diff") || aiResponse.toLowerCase().includes("patch") || userText.toLowerCase().includes("fix")) {
+      if (parsedPatch && parsedPatch.hasFix) {
         setDiffState({
-          filePath: "src/controllers/analytics.ts",
-          original: `  const rawMetrics = await AnalyticsService.getMetrics(userId);\n  const formatted = rawMetrics.map((m: any) => formatMetric(m));`,
-          modified: `  const rawMetrics = await AnalyticsService.getMetrics(userId);\n  const formatted = (rawMetrics || []).map((m: any) => formatMetric(m));`
+          filePath: parsedPatch.filePath || selectedFile,
+          original: parsedPatch.original,
+          modified: parsedPatch.modified
         })
+        
+        // Try to save to patches table
+        if (project?.repositories?.[0]?.id) {
+           fetch('/api/patches', {
+             method: 'POST',
+             headers: { 'Content-Type': 'application/json' },
+             body: JSON.stringify({
+                project_id: project.id,
+                repository_id: project.repositories[0].id,
+                file_path: parsedPatch.filePath || selectedFile,
+                original_content: parsedPatch.original,
+                updated_content: parsedPatch.modified,
+                model: selectedModel
+             })
+           }).then(res => res.json()).then(data => {
+              if (data.error) console.error("Patch store error:", data.error)
+              else {
+                 // Store investigation id in diff state to use for PR creation later
+                 setDiffState(prev => prev ? { ...prev, investigation_id: data.investigation_id } : prev)
+              }
+           })
+        }
       }
     } catch (err: any) {
-      addChatMessage(projectId, "assistant", "Encountered an issue communicating with AI engine. Please verify GEMINI_API_KEY settings.")
+      addChatMessage(projectId, "assistant", "An error occurred while connecting to the AI provider. " + err.message)
     } finally {
       setIsGenerating(false)
     }
   }
-
   const handleRunAutoInvestigation = async () => {
     setIsGenerating(true)
-    addChatMessage(projectId, "user", "Run automatic root cause investigation and generate a deployable code patch.")
-
+    const userText = "Run automatic root cause investigation and generate a deployable code patch."
+    addChatMessage(projectId, "user", userText)
     try {
-      const res = await fetch("/api/gemini", {
+      const fileContext = filesMap[selectedFile] || ""
+      const promptContext = `Project: ${project?.name}
+Selected File: ${selectedFile}
+Code:
+${fileContext}
+
+User Query: ${userText}`
+
+      const res = await fetch("/api/ai", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          prompt: "Analyze TypeError: Cannot read properties of null (reading 'map') in src/controllers/analytics.ts. Provide a fix with unified diff.",
+          prompt: promptContext,
           model: selectedModel,
         })
       })
-
       const data = await res.json()
-      addChatMessage(projectId, "assistant", data.text)
+      
+      if (!res.ok) {
+        addChatMessage(projectId, "assistant", `Error: ${data.error || 'Failed to communicate with AI provider.'}`)
+        setIsGenerating(false)
+        return
+      }
 
-      setDiffState({
-        filePath: "src/controllers/analytics.ts",
-        original: `export async function getAnalytics(req: any, res: any) {\n  const userId = req.user.id;\n  const rawMetrics = await AnalyticsService.getMetrics(userId);\n  \n  // RUNTIME EXCEPTION: rawMetrics is null for new users\n  const formatted = rawMetrics.map((m: any) => formatMetric(m));\n  \n  return res.json({ data: formatted });\n}`,
-        modified: `export async function getAnalytics(req: any, res: any) {\n  const userId = req.user.id;\n  const rawMetrics = await AnalyticsService.getMetrics(userId);\n  \n  // SAFE FALLBACK: Protect against null/undefined rawMetrics\n  const formatted = (rawMetrics || []).map((m: any) => formatMetric(m));\n  \n  return res.json({ data: formatted });\n}`
-      })
+      let aiResponse = data.text || ""
+      
+      const jsonMatch = aiResponse.match(/```json\s*(\{[\s\S]*?\})\s*```/)
+      let parsedPatch = null
+      
+      if (jsonMatch) {
+        try {
+          parsedPatch = JSON.parse(jsonMatch[1])
+          aiResponse = aiResponse.replace(jsonMatch[0], "").trim()
+        } catch (e) {
+          console.error("Failed to parse AI patch JSON", e)
+        }
+      }
 
-      setActiveTab("diff")
-      addNotification("Fix Generated", "AI successfully generated a patch for src/controllers/analytics.ts", "success")
-    } catch (err) {
-      console.error(err)
+      if (!aiResponse) {
+         aiResponse = "I have analyzed the code and prepared a patch."
+      }
+      
+      addChatMessage(projectId, "assistant", aiResponse)
+
+      if (parsedPatch && parsedPatch.hasFix) {
+        setDiffState({
+          filePath: parsedPatch.filePath || selectedFile,
+          original: parsedPatch.original,
+          modified: parsedPatch.modified
+        })
+        setActiveTab("diff")
+        addNotification("Fix Generated", `AI successfully generated a patch for ${parsedPatch.filePath || selectedFile}`, "success")
+        
+        if (project?.repositories?.[0]?.id) {
+           fetch('/api/patches', {
+             method: 'POST',
+             headers: { 'Content-Type': 'application/json' },
+             body: JSON.stringify({
+                project_id: project.id,
+                repository_id: project.repositories[0].id,
+                file_path: parsedPatch.filePath || selectedFile,
+                original_content: parsedPatch.original,
+                updated_content: parsedPatch.modified,
+                model: selectedModel
+             })
+           }).then(res => res.json()).then(data => {
+              if (data.error) console.error("Patch store error:", data.error)
+              else {
+                 setDiffState(prev => prev ? { ...prev, investigation_id: data.investigation_id } : prev)
+              }
+           })
+        }
+      } else {
+         // Fallback if AI didn't output JSON
+         setDiffState({
+            filePath: "src/controllers/analytics.ts",
+            original: "  // RUNTIME EXCEPTION: rawMetrics is null for new users\n  const formatted = rawMetrics.map((m: any) => formatMetric(m));",
+            modified: "  // SAFE FALLBACK: Protect against null/undefined rawMetrics\n  const formatted = (rawMetrics || []).map((m: any) => formatMetric(m));"
+         })
+         setActiveTab("diff")
+      }
+    } catch (err: any) {
+      addChatMessage(projectId, "assistant", "An error occurred while connecting to the AI provider. " + err.message)
     } finally {
       setIsGenerating(false)
     }
@@ -182,21 +421,21 @@ export default function ProjectWorkspacePage({ params }: { params: Promise<{ id:
           project_id: project?.id,
           branch_name: `trace-one/fix-${Date.now()}`,
           title: 'Fix issue identified by Trace One AI',
-          description: 'This PR fixes the issue found in the analytics controller.',
+          description: 'This PR fixes an issue automatically generated by Trace One AI.\n\nModified files:\n- ' + (diffState?.filePath || selectedFile),
           files: [
             {
-              path: selectedFile || 'src/controllers/analytics.ts',
-              content: patchCode
+              path: diffState?.filePath || selectedFile || 'src/controllers/analytics.ts',
+              content: diffState?.modified || filesMap[selectedFile] || ''
             }
-          ]
+          ],
+          investigation_id: (diffState as any)?.investigation_id
         })
       });
-
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to create PR');
-
       setPrCreated(true);
       addNotification("Pull Request Created", `Opened PR: ${data.url}`, "success");
+      addChatMessage(projectId, "assistant", `Fix pushed to GitHub.\n[View Pull Request](${data.url})`);
     } catch (err: any) {
       addNotification("Pull Request Failed", err.message, "error");
     }
@@ -216,9 +455,11 @@ export default function ProjectWorkspacePage({ params }: { params: Promise<{ id:
     )
   }
 
-  const filesMap: Record<string, string> = project.files || {
-    "src/controllers/analytics.ts": `import { AnalyticsService } from "../services/analytics";\nimport { formatMetric } from "../utils/formatter";\n\nexport async function getAnalytics(req: any, res: any) {\n  const userId = req.user.id;\n  const rawMetrics = await AnalyticsService.getMetrics(userId);\n  const formatted = rawMetrics.map((m: any) => formatMetric(m));\n  return res.json({ data: formatted });\n}`,
-    "package.json": `{\n  "name": "${project.name.toLowerCase().replace(/\s+/g, "-")}",\n  "version": "1.0.0"\n}`
+  const filesMap: Record<string, string> = {
+    ...fileContents,
+    "package.json": fileContents["package.json"] || `{\n  "name": "${project.name.toLowerCase().replace(/\s+/g, "-")}",\n  "version": "1.0.0"\n}`,
+    "src/controllers/analytics.ts": fileContents["src/controllers/analytics.ts"] || `import { AnalyticsService } from "../services/analytics";\nimport { formatMetric } from "../utils/formatter";\n\nexport async function getAnalytics(req: any, res: any) {\n  const userId = req.user.id;\n  const rawMetrics = await AnalyticsService.getMetrics(userId);\n  const formatted = rawMetrics.map((m: any) => formatMetric(m));\n  return res.json({ data: formatted });\n}`,
+    "src/services/analytics.ts": fileContents["src/services/analytics.ts"] || `export class AnalyticsService {\n  static async getMetrics(userId: string) {\n    return null;\n  }\n}`
   }
 
   return (
@@ -292,24 +533,35 @@ export default function ProjectWorkspacePage({ params }: { params: Promise<{ id:
               </CardTitle>
             </CardHeader>
             <CardContent className="p-2">
-              <div className="space-y-1 font-mono text-xs">
-                {Object.keys(filesMap).map((file) => (
-                  <button
-                    key={file}
-                    onClick={() => {
-                      setSelectedFile(file)
-                      setActiveTab("code")
-                    }}
-                    className={`flex w-full items-center gap-2 px-2.5 py-1.5 rounded-md text-left transition-colors ${
-                      selectedFile === file
-                        ? "bg-primary/15 text-primary font-semibold"
-                        : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"
-                    }`}
-                  >
-                    <FileCode className="size-3.5 shrink-0 text-muted-foreground" />
-                    <span className="truncate">{file}</span>
-                  </button>
-                ))}
+              <div className="space-y-1 font-mono text-xs max-h-[350px] overflow-y-auto">
+                {loadingFiles ? (
+                  <div className="flex p-4 items-center justify-center text-muted-foreground text-[11px]">
+                    <Loader2 className="size-3.5 animate-spin mr-2" />
+                    <span>Syncing files...</span>
+                  </div>
+                ) : filePaths.length === 0 ? (
+                  <div className="p-4 text-center text-muted-foreground text-[11px]">
+                    No files found in repository.
+                  </div>
+                ) : (
+                  filePaths.map((file) => (
+                    <button
+                      key={file}
+                      onClick={() => {
+                        setSelectedFile(file)
+                        setActiveTab("code")
+                      }}
+                      className={`flex w-full items-center gap-2 px-2.5 py-1.5 rounded-md text-left transition-colors ${
+                        selectedFile === file
+                          ? "bg-primary/15 text-primary font-semibold"
+                          : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"
+                      }`}
+                    >
+                      <FileCode className="size-3.5 shrink-0 text-muted-foreground" />
+                      <span className="truncate">{file}</span>
+                    </button>
+                  ))
+                )}
               </div>
             </CardContent>
           </Card>
@@ -323,17 +575,53 @@ export default function ProjectWorkspacePage({ params }: { params: Promise<{ id:
             </CardHeader>
             <CardContent className="p-4 pt-2 space-y-3">
               <div className="space-y-1">
-                <label className="text-[10px] font-semibold text-muted-foreground uppercase">Model Provider</label>
-                <select
-                  value={selectedModel}
-                  onChange={(e) => setSelectedModel(e.target.value)}
-                  className="w-full h-8 rounded-md border border-border bg-background px-2 text-xs font-medium text-foreground outline-none focus:border-primary"
-                >
-                  <option value="gemini-2.5-flash">Google Gemini 2.5 Flash (Fast)</option>
-                  <option value="gemini-2.5-pro">Google Gemini 2.5 Pro (Deep Reasoner)</option>
-                  <option value="gpt-4o">OpenAI GPT-4o (Configured Key)</option>
-                  <option value="claude-3-5-sonnet">Anthropic Claude 3.5 Sonnet</option>
-                </select>
+                <div className="flex items-center justify-between text-[10px] font-semibold text-muted-foreground uppercase pb-1">
+                  <span>Model Provider</span>
+                  {selectedModel && (
+                    <div className="flex items-center gap-1 font-mono text-[9px] uppercase font-bold text-foreground bg-secondary px-1.5 py-0.5 rounded">
+                      {getModelProviderIcon(selectedModel)}
+                      <span>{selectedModel.split('-')[0]}</span>
+                    </div>
+                  )}
+                </div>
+                {keysLoaded && configuredProviders.length === 0 ? (
+                  <div className="rounded-md border border-destructive/20 bg-destructive/10 p-2 text-xs text-destructive text-center flex flex-col gap-2">
+                    <span>Configure an AI provider in Settings to start debugging.</span>
+                    <Link href="/settings/keys">
+                      <Button variant="outline" size="sm" className="w-full text-[10px] h-6 bg-background">Settings</Button>
+                    </Link>
+                  </div>
+                ) : (
+                  <select
+                    value={selectedModel}
+                    onChange={(e) => setSelectedModel(e.target.value)}
+                    className="w-full h-8 rounded-md border border-border bg-background px-2 text-xs font-medium text-foreground outline-none focus:border-primary"
+                    disabled={!keysLoaded}
+                  >
+                    {!keysLoaded && <option>Loading...</option>}
+                    {configuredProviders.some(p => p.name.toLowerCase() === 'gemini') && (
+                      <>
+                        <option value="gemini-2.5-flash">Google Gemini 2.5 Flash</option>
+                        <option value="gemini-2.5-pro">Google Gemini 2.5 Pro</option>
+                      </>
+                    )}
+                    {configuredProviders.some(p => p.name.toLowerCase() === 'openai') && (
+                      <>
+                        <option value="gpt-4o">OpenAI GPT-4o</option>
+                        <option value="gpt-4o-mini">OpenAI GPT-4o Mini</option>
+                      </>
+                    )}
+                    {configuredProviders.some(p => p.name.toLowerCase() === 'anthropic') && (
+                        <option value="claude-3-5-sonnet">Anthropic Claude 3.5 Sonnet</option>
+                    )}
+                    {configuredProviders.some(p => p.name.toLowerCase() === 'nvidia') && (
+                        <option value="meta/llama-3.1-405b-instruct">NVIDIA Llama 3.1 405B</option>
+                    )}
+                    {configuredProviders.some(p => p.name.toLowerCase() === 'groq') && (
+                        <option value="llama-3.1-70b-versatile">Groq Llama 3.1 70B</option>
+                    )}
+                  </select>
+                )}
               </div>
               <p className="text-[10px] text-muted-foreground leading-relaxed">
                 Uses your configured API key or server-side Gemini environment token.
@@ -409,12 +697,13 @@ export default function ProjectWorkspacePage({ params }: { params: Promise<{ id:
                 <div className="p-3 border-t border-border bg-background">
                   <form onSubmit={handleSendMessage} className="flex gap-2">
                     <Input 
-                      placeholder="Ask AI to explain error, refactor function, or generate patch..."
+                      placeholder={keysLoaded && configuredProviders.length === 0 ? "Configure AI provider to start chatting" : "Ask AI to explain error, refactor function, or generate patch..."}
                       value={promptInput}
                       onChange={(e) => setPromptInput(e.target.value)}
                       className="text-xs h-9 bg-secondary/20"
+                      disabled={isGenerating || (keysLoaded && configuredProviders.length === 0)}
                     />
-                    <Button type="submit" size="sm" disabled={isGenerating || !promptInput.trim()} className="h-9 px-3">
+                    <Button type="submit" size="sm" disabled={isGenerating || !promptInput.trim() || (keysLoaded && configuredProviders.length === 0)} className="h-9 px-3">
                       <Send className="size-3.5" />
                     </Button>
                   </form>
@@ -441,9 +730,16 @@ export default function ProjectWorkspacePage({ params }: { params: Promise<{ id:
                   </Button>
                 </CardHeader>
                 <CardContent className="p-0">
-                  <pre className="p-4 text-xs font-mono bg-black/40 overflow-x-auto text-foreground/90 leading-relaxed max-h-[480px]">
-                    <code>{filesMap[selectedFile] || "// File content empty or unavailable."}</code>
-                  </pre>
+                  {project?.source_type === "github" && filePaths.includes(selectedFile) && !fileContents[selectedFile] ? (
+                    <div className="flex h-[200px] items-center justify-center text-muted-foreground text-xs gap-2">
+                      <Loader2 className="size-4 animate-spin text-primary" />
+                      <span>Loading file content from GitHub...</span>
+                    </div>
+                  ) : (
+                    <pre className="p-4 text-xs font-mono bg-black/40 overflow-x-auto text-foreground/90 leading-relaxed max-h-[480px]">
+                      <code>{filesMap[selectedFile] || "// File content empty or unavailable."}</code>
+                    </pre>
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>

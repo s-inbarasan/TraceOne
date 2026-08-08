@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { useState } from "react"
 import { 
   Activity, 
   Settings, 
@@ -16,7 +17,8 @@ import {
   Bot,
   Plus,
   GitBranch,
-  LogOut
+  LogOut,
+  AlertCircle
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { GithubIcon } from "@/components/ui/icons"
@@ -24,10 +26,13 @@ import { useWorkspace } from "@/lib/context/WorkspaceContext"
 import { motion, AnimatePresence } from "motion/react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Button } from "@/components/ui/button"
 
 export function Sidebar() {
   const pathname = usePathname()
   const router = useRouter()
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
   const { 
     profile, 
     projects, 
@@ -251,7 +256,7 @@ export function Sidebar() {
 
         {!sidebarCollapsed ? (
           <button 
-            onClick={handleLogout}
+            onClick={() => setShowLogoutConfirm(true)}
             className="flex w-full items-center gap-2 rounded-md hover:bg-destructive/15 text-xs text-muted-foreground hover:text-destructive py-1.5 px-2 transition-colors cursor-pointer"
           >
             <LogOut className="size-3.5" />
@@ -266,6 +271,28 @@ export function Sidebar() {
           </button>
         )}
       </div>
+
+      <Dialog open={showLogoutConfirm} onOpenChange={setShowLogoutConfirm}>
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertCircle className="size-5 text-destructive" />
+              Sign Out Confirmation
+            </DialogTitle>
+            <DialogDescription className="pt-2 text-xs text-muted-foreground leading-relaxed">
+              Are you sure you want to sign out of Trace One? You will need to sign in again to access your active projects and exception workspaces.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0 mt-4">
+            <Button variant="outline" size="sm" onClick={() => setShowLogoutConfirm(false)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" size="sm" onClick={handleLogout}>
+              Sign Out
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </motion.div>
   )
 }

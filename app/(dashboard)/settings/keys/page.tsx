@@ -3,42 +3,36 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Key, Eye, EyeOff, Plus, Trash2, CheckCircle2, AlertCircle, RefreshCw, Loader2 } from "lucide-react"
+import { Key, Eye, EyeOff, Plus, Trash2, CheckCircle2, AlertCircle, RefreshCw, Loader2, Bot, Sparkles, Brain, Cpu, Zap } from "lucide-react"
 import { useState, useEffect } from "react"
 import { Badge } from "@/components/ui/badge"
-import { createClient } from "@/lib/supabase/client"
-
-const SUPPORTED_PROVIDERS = [
-  { id: "openai", name: "OpenAI" },
-  { id: "anthropic", name: "Anthropic" },
-  { id: "gemini", name: "Google Gemini" },
-  { id: "nvidia", name: "NVIDIA" },
-  { id: "groq", name: "Groq" },
-  { id: "openrouter", name: "OpenRouter" },
-  { id: "mistral", name: "Mistral" },
-]
 
 export default function ApiKeysPage() {
   const [showKey, setShowKey] = useState<Record<string, boolean>>({})
   const [loading, setLoading] = useState(true)
+  const [providers, setProviders] = useState<any[]>([])
   const [keys, setKeys] = useState<Record<string, any>>({})
   const [editing, setEditing] = useState<Record<string, boolean>>({})
   const [newKeyValues, setNewKeyValues] = useState<Record<string, string>>({})
   const [validating, setValidating] = useState<Record<string, boolean>>({})
-  const supabase = createClient()
 
-  const fetchKeys = async () => {
+  const fetchKeysAndProviders = async () => {
     try {
-      const { data, error } = await supabase.from('api_keys').select('*')
-      if (error) throw error
+      const res = await fetch('/api/keys')
+      const data = await res.json()
       
-      const keyMap: Record<string, any> = {}
-      if (data) {
-        data.forEach(k => {
-          keyMap[k.provider] = k
-        })
+      if (data.success) {
+        // Exclude GitHub since it's handled via OAuth, we only want AI providers here
+        setProviders(data.providers.filter((p: any) => p.name.toLowerCase() !== 'github'))
+        
+        const keyMap: Record<string, any> = {}
+        if (data.keys) {
+          data.keys.forEach((k: any) => {
+            keyMap[k.provider_id] = k
+          })
+        }
+        setKeys(keyMap)
       }
-      setKeys(keyMap)
     } catch (err) {
       console.error("Failed to load API keys", err)
     } finally {
@@ -47,34 +41,8 @@ export default function ApiKeysPage() {
   }
 
   useEffect(() => {
-    let isMounted = true
-    async function loadKeys() {
-      try {
-        const { data, error } = await supabase.from('api_keys').select('*')
-        if (error) throw error
-        
-        const keyMap: Record<string, any> = {}
-        if (data) {
-          data.forEach(k => {
-            keyMap[k.provider] = k
-          })
-        }
-        if (isMounted) {
-          setKeys(keyMap)
-        }
-      } catch (err) {
-        console.error("Failed to load API keys", err)
-      } finally {
-        if (isMounted) {
-          setLoading(false)
-        }
-      }
-    }
-    loadKeys()
-    return () => {
-      isMounted = false
-    }
-  }, [supabase])
+    fetchKeysAndProviders()
+  }, [])
 
   const toggleKey = (id: string) => {
     setShowKey(prev => ({ ...prev, [id]: !prev[id] }))
@@ -86,17 +54,16 @@ export default function ApiKeysPage() {
       const val = newKeyValues[providerId]
       if (!val) return
 
-      // Upsert into Supabase
-      const { error } = await supabase.from('api_keys').upsert({
-        provider: providerId,
-        key_hash: val, // In a real app, this should be sent to a secure endpoint to encrypt
-        last_validated: new Date().toISOString(),
-        status: 'valid'
-      }, { onConflict: 'provider' })
+      const res = await fetch('/api/keys', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provider_id: providerId, api_key: val })
+      })
+      const data = await res.json()
 
-      if (error) throw error
+      if (!res.ok || !data.success) throw new Error(data.error || "Failed to save")
       
-      await fetchKeys()
+      await fetchKeysAndProviders()
       setEditing(prev => ({ ...prev, [providerId]: false }))
       setNewKeyValues(prev => ({ ...prev, [providerId]: '' }))
     } catch (err) {
@@ -108,9 +75,12 @@ export default function ApiKeysPage() {
 
   const handleDeleteKey = async (providerId: string) => {
     try {
-      const { error } = await supabase.from('api_keys').delete().eq('provider', providerId)
-      if (error) throw error
-      await fetchKeys()
+      const res = await fetch(`/api/keys?provider_id=${providerId}`, {
+        method: 'DELETE'
+      })
+      if (res.ok) {
+        await fetchKeysAndProviders()
+      }
     } catch (err) {
       console.error("Failed to delete key", err)
     }
@@ -128,11 +98,11 @@ export default function ApiKeysPage() {
     <div className="space-y-8 max-w-4xl">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight text-foreground">API Keys</h1>
-        <p className="text-sm text-muted-foreground">Manage your LLM provider keys used for AI investigations.</p>
+        <p className="text-sm text-muted-foreground">Manage your AI provider keys used for investigations and patch generation.</p>
       </div>
 
       <div className="space-y-4">
-        {SUPPORTED_PROVIDERS.map((provider) => {
+        {providers.map((provider) => {
           const isConfigured = !!keys[provider.id]
           const isEditing = editing[provider.id]
           const keyData = keys[provider.id]
@@ -142,25 +112,30 @@ export default function ApiKeysPage() {
               <CardHeader className="flex flex-row items-center justify-between pb-4">
                 <div className="space-y-1">
                   <CardTitle className="text-base flex items-center gap-2">
+                    {provider.name.toLowerCase().includes('gemini') && <div className="size-5 rounded-full bg-blue-500/10 text-blue-500 flex items-center justify-center"><Sparkles className="size-3" /></div>}
+                    {provider.name.toLowerCase().includes('openai') && <div className="size-5 rounded-full bg-emerald-500/10 text-emerald-500 flex items-center justify-center"><Bot className="size-3" /></div>}
+                    {provider.name.toLowerCase().includes('anthropic') && <div className="size-5 rounded-full bg-amber-500/10 text-amber-500 flex items-center justify-center"><Brain className="size-3" /></div>}
+                    {provider.name.toLowerCase().includes('nvidia') && <div className="size-5 rounded-full bg-green-500/10 text-green-500 flex items-center justify-center"><Cpu className="size-3" /></div>}
+                    {provider.name.toLowerCase().includes('groq') && <div className="size-5 rounded-full bg-red-500/10 text-red-500 flex items-center justify-center"><Zap className="size-3" /></div>}
                     {provider.name}
                     {isConfigured ? (
-                      <Badge variant="success" className="text-[10px] h-5 px-1.5 flex items-center gap-1">
-                        <CheckCircle2 className="size-3" /> Configured
+                      <Badge variant="default" className="text-[10px] h-5 px-1.5 flex items-center gap-1 bg-green-500/10 text-green-500 hover:bg-green-500/20 border-green-500/20">
+                        <CheckCircle2 className="size-3" /> Connected
                       </Badge>
                     ) : (
                       <Badge variant="outline" className="text-[10px] h-5 px-1.5 text-muted-foreground">Not Configured</Badge>
                     )}
                   </CardTitle>
                   <CardDescription>
-                    {isConfigured && keyData?.last_validated ? 
-                      `Last validated: ${new Date(keyData.last_validated).toLocaleString()}` : 
+                    {isConfigured && keyData?.updated_at ? 
+                      `Last updated: ${new Date(keyData.updated_at).toLocaleString()}` : 
                       'Used for root cause analysis and patch generation.'}
                   </CardDescription>
                 </div>
                 <div className="flex items-center gap-2">
                   {isConfigured && !isEditing ? (
                     <>
-                      <Button variant="outline" size="sm" onClick={() => setEditing(prev => ({ ...prev, [provider.id]: true }))}>
+                      <Button variant="outline" size="sm" onClick={() => { setEditing(prev => ({ ...prev, [provider.id]: true })); setNewKeyValues(prev => ({ ...prev, [provider.id]: keyData?.encrypted_key || '' })); }}>
                         Edit
                       </Button>
                       <Button variant="destructive" size="sm" className="gap-2" onClick={() => handleDeleteKey(provider.id)}>
@@ -187,12 +162,19 @@ export default function ApiKeysPage() {
                             <Key className="size-4" />
                           </div>
                           <Input 
-                            type="password" 
+                            type={showKey[provider.id] ? "text" : "password"} 
                             placeholder={`Enter your ${provider.name} API Key`}
-                            className="pl-9 font-mono"
+                            className="pl-9 pr-9 font-mono"
                             value={newKeyValues[provider.id] || ''}
                             onChange={(e) => setNewKeyValues(prev => ({ ...prev, [provider.id]: e.target.value }))}
                           />
+                          <button 
+                            type="button"
+                            onClick={() => toggleKey(provider.id)}
+                            className="absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground hover:text-foreground"
+                          >
+                            {showKey[provider.id] ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                          </button>
                         </div>
                         <Button 
                           onClick={() => handleSaveKey(provider.id)}
@@ -200,12 +182,12 @@ export default function ApiKeysPage() {
                           className="min-w-[100px]"
                         >
                           {validating[provider.id] ? <Loader2 className="size-4 animate-spin mr-2" /> : null}
-                          Save & Validate
+                          Save
                         </Button>
                       </div>
                       <div className="text-xs text-muted-foreground flex items-center gap-1.5">
                         <AlertCircle className="size-3.5" /> 
-                        Keys are securely encrypted before being stored.
+                        Keys are securely stored and never exposed in the browser.
                       </div>
                     </div>
                   ) : (
@@ -216,7 +198,7 @@ export default function ApiKeysPage() {
                         </div>
                         <Input 
                           type={showKey[provider.id] ? "text" : "password"} 
-                          value={showKey[provider.id] ? keyData?.key_hash || "sk-..." : "sk-................................................"} 
+                          value={keyData?.encrypted_key || ""} 
                           className="pl-9 font-mono"
                           readOnly
                         />
@@ -227,9 +209,6 @@ export default function ApiKeysPage() {
                           {showKey[provider.id] ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                         </button>
                       </div>
-                      <Button variant="outline" className="gap-2" onClick={() => {}}>
-                        <RefreshCw className="size-4" /> Test Connection
-                      </Button>
                     </div>
                   )}
                 </CardContent>
