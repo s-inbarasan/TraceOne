@@ -121,34 +121,53 @@ export default function ProjectWorkspacePage({ params }: { params: Promise<{ id:
       try {
         const supabase = createClient()
         
-        // 1. Fetch repositories for the project to ensure repositories array is populated
+        // 0. Resolve project by UUID or slug
+        let realProjectId = projectId
+        const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(projectId)
+        
+        let projObj = null
+        if (isUUID) {
+          const { data: pData } = await supabase.from("projects").select("*").eq("id", projectId).maybeSingle()
+          if (pData) projObj = pData
+        }
+        if (!projObj) {
+          const { data: pData } = await supabase.from("projects").select("*").eq("slug", projectId).maybeSingle()
+          if (pData) projObj = pData
+        }
+
+        if (projObj) {
+          realProjectId = projObj.id
+        }
+
+        // 1. Fetch repositories for the project
         const { data: repos, error: reposErr } = await supabase
           .from("repositories")
           .select("*")
-          .eq("project_id", projectId)
+          .eq("project_id", realProjectId)
 
         if (!reposErr && repos && repos.length > 0) {
           setProject(prev => {
             if (!prev) {
               return {
-                id: projectId,
-                name: "Project",
-                slug: projectId,
+                id: realProjectId,
+                name: projObj?.name || "Project",
+                slug: projObj?.slug || projectId,
                 source_type: "github",
                 repository: repos[0].full_name,
                 repositories: repos,
                 status: "healthy",
-                created_at: new Date().toISOString()
+                created_at: projObj?.created_at || new Date().toISOString()
               } as any
             }
             return {
               ...prev,
+              id: realProjectId,
               repositories: repos
             }
           })
         }
 
-        // 2. Fetch active incident (either the parameterized one or the latest project incident)
+        // 2. Fetch active incident
         let incident = null
         if (incidentIdParam) {
           const { data, error } = await supabase
@@ -165,7 +184,7 @@ export default function ProjectWorkspacePage({ params }: { params: Promise<{ id:
           const { data, error } = await supabase
             .from("incidents")
             .select("*")
-            .eq("project_id", projectId)
+            .eq("project_id", realProjectId)
             .order("created_at", { ascending: false })
             .limit(1)
             .maybeSingle()
@@ -174,23 +193,42 @@ export default function ProjectWorkspacePage({ params }: { params: Promise<{ id:
           }
         }
 
-        if (!incident) return
-
-        setActiveIncident(incident)
-        if (incident.file_path) {
-          setSelectedFile(incident.file_path)
+        if (incident) {
+          setActiveIncident(incident)
+          if (incident.file_path) {
+            setSelectedFile(incident.file_path)
+          }
         }
 
-        // 3. Fetch the latest investigation for this incident
-        const { data: investigation, error: invErr } = await supabase
-          .from("investigations")
-          .select("*")
-          .eq("incident_id", incident.id)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle()
+        // 3. Fetch the latest investigation for this project (either by incident or project_id directly)
+        let investigation = null
+        if (incident) {
+          const { data: inv, error: invErr } = await supabase
+            .from("investigations")
+            .select("*")
+            .eq("incident_id", incident.id)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle()
+          if (!invErr && inv) {
+            investigation = inv
+          }
+        }
 
-        if (invErr || !investigation) return
+        if (!investigation) {
+          const { data: invByProj } = await supabase
+            .from("investigations")
+            .select("*")
+            .eq("project_id", realProjectId)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle()
+          if (invByProj) {
+            investigation = invByProj
+          }
+        }
+
+        if (!investigation) return
 
         // 4. Fetch the latest patch for this investigation
         const { data: patch, error: patchErr } = await supabase
@@ -203,7 +241,7 @@ export default function ProjectWorkspacePage({ params }: { params: Promise<{ id:
 
         if (patchErr || !patch) return
 
-        // Reconstruct the Proposed Diff state
+        // Reconstruct the Proposed Diff state reliably
         setDiffState({
           filePath: patch.file_path,
           original: patch.original_content,
