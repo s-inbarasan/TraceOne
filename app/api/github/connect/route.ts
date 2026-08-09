@@ -18,6 +18,8 @@ export async function POST(req: NextRequest) {
     }
 
     const { data: { user }, error: userError } = await supabase.auth.getUser();
+    console.log(`[GitHub Connect] userId: ${user?.id || "null"}`);
+    
     if (userError || !user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }

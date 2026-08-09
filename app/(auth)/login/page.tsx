@@ -51,8 +51,7 @@ export default function LoginPage() {
         password,
       });
       if (error) throw error;
-      router.push("/dashboard");
-      router.refresh();
+      window.location.href = "/dashboard";
     } catch (err: any) {
       setError(err.message || "Failed to sign in");
     } finally {
@@ -196,7 +195,7 @@ export default function LoginPage() {
               </TabsList>
 
               <TabsContent value="login">
-                <form onSubmit={handleEmailSignIn} className="space-y-4">
+                <form onSubmit={handleEmailSignIn} action="javascript:void(0);" className="space-y-4">
                   <div className="space-y-2">
                     <label
                       className="text-sm font-medium leading-none"
@@ -260,7 +259,7 @@ export default function LoginPage() {
               </TabsContent>
 
               <TabsContent value="signup">
-                <form onSubmit={handleEmailSignUp} className="space-y-4">
+                <form onSubmit={handleEmailSignUp} action="javascript:void(0);" className="space-y-4">
                   <div className="space-y-2">
                     <label
                       className="text-sm font-medium leading-none"

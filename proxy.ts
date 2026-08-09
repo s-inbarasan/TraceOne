@@ -35,15 +35,23 @@ export async function proxy(request: NextRequest) {
       data: { user },
     } = await supabase.auth.getUser()
 
-    // Define protected and auth routes
+    // Add required server-side diagnostics
+    if (user) {
+      console.log(`[Auth] userId: ${user.id}`)
+    } else {
+      console.log(`[Auth] userId: null`)
+    }
+
+    // Define protected, auth, and api routes
     const isAuthRoute = request.nextUrl.pathname.startsWith('/login') || request.nextUrl.pathname.startsWith('/auth')
+    const isApiRoute = request.nextUrl.pathname.startsWith('/api')
     const isMarketingRoute = 
       request.nextUrl.pathname === '/' || 
       request.nextUrl.pathname.startsWith('/#') || 
       request.nextUrl.pathname.startsWith('/privacy') || 
       request.nextUrl.pathname.startsWith('/terms')
 
-    if (!user && !isAuthRoute && !isMarketingRoute) {
+    if (!user && !isAuthRoute && !isMarketingRoute && !isApiRoute) {
       // Redirect unauthenticated users to login if they try to access protected routes
       const url = request.nextUrl.clone()
       url.pathname = '/login'
