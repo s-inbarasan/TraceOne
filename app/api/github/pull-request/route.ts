@@ -34,121 +34,100 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { project_id, branch_name, title, description, files, investigation_id } = await req.json();
+    const body = await req.json();
+    const patchId = body.patchId || body.patch_id;
+    const { project_id, branch_name, title, description, files, investigation_id, investigationId } = body;
+
+    console.log("[Submit PR] received patchId:", patchId);
+
+    if (!patchId) {
+      return NextResponse.json({ error: "Patch ID is required" }, { status: 400 });
+    }
+
+    if (!isValidUUID(patchId)) {
+      return NextResponse.json({ error: "Patch not found", patchId }, { status: 404 });
+    }
 
     if (!project_id || !branch_name || !title || !files || files.length === 0) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    // 1. Verify / resolve project owned by authenticated user
-    let projectRecord: any = null;
+    // 1. Fetch exact patch record by patchId UUID
+    const { data: patchRecord, error: patchError } = await supabase
+      .from('patches')
+      .select('id, repository_id, investigation_id, file_path, original_content, updated_content, unified_diff, explanation')
+      .eq('id', patchId)
+      .maybeSingle();
 
-    if (isValidUUID(project_id)) {
-      const { data: pById } = await supabase
-        .from('projects')
-        .select('*')
-        .eq('id', project_id)
-        .eq('user_id', user.id)
-        .maybeSingle();
-      if (pById) projectRecord = pById;
+    console.log("[Submit PR] found patch:", patchRecord?.id);
+
+    if (patchError || !patchRecord) {
+      return NextResponse.json({ error: "Patch not found", patchId }, { status: 404 });
     }
 
-    if (!projectRecord) {
-      const { data: pBySlug } = await supabase
-        .from('projects')
-        .select('*')
-        .eq('slug', project_id)
-        .eq('user_id', user.id)
-        .maybeSingle();
-      if (pBySlug) projectRecord = pBySlug;
+    // 2. Verify investigation ownership & associated project
+    const targetInvestigationId = investigationId || investigation_id || patchRecord.investigation_id;
+
+    const { data: investigationRecord, error: investigationError } = await supabase
+      .from('investigations')
+      .select('id, project_id, incident_id')
+      .eq('id', targetInvestigationId)
+      .maybeSingle();
+
+    if (investigationError || !investigationRecord) {
+      return NextResponse.json({ error: 'Investigation associated with patch not found' }, { status: 404 });
     }
 
-    if (!projectRecord) {
-      const slugVal = String(project_id);
-      const nameVal = slugVal.startsWith('github-')
-        ? slugVal.replace('github-', '').replace('-', '/')
-        : 'Project';
+    if (patchRecord.investigation_id !== investigationRecord.id) {
+      return NextResponse.json({ error: 'Patch investigation mismatch' }, { status: 400 });
+    }
 
-      const insertPayload: any = {
-        name: nameVal,
-        slug: slugVal,
-        user_id: user.id,
-        source_type: 'github'
-      };
+    // Verify project owned by authenticated user
+    const { data: projectRecord, error: projectError } = await supabase
+      .from('projects')
+      .select('id, user_id, slug, name')
+      .eq('id', investigationRecord.project_id)
+      .eq('user_id', user.id)
+      .maybeSingle();
 
-      if (isValidUUID(project_id)) {
-        insertPayload.id = project_id;
-      }
-
-      const { data: newProj } = await supabase
-        .from('projects')
-        .insert(insertPayload)
-        .select('*')
-        .maybeSingle();
-
-      if (newProj) {
-        projectRecord = newProj;
-      } else {
-        const { data: fallbackProj } = await supabase
-          .from('projects')
-          .select('*')
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
-        if (fallbackProj) {
-          projectRecord = fallbackProj;
-        } else {
-          return NextResponse.json({ error: 'Project not found' }, { status: 404 });
-        }
-      }
+    if (projectError || !projectRecord) {
+      return NextResponse.json({ error: 'Unauthorized: Project not found or not owned by user' }, { status: 403 });
     }
 
     const realProjectId = projectRecord.id;
 
-    // 2. Verify / resolve repository exists for this project
+    // 3. Verify repository exists for this project and matches patchRecord.repository_id
     let repoRecord: any = null;
 
-    const { data: repoFetch } = await supabase
-      .from('repositories')
-      .select('id, github_id, full_name, owner_login, repo_name, default_branch')
-      .eq('project_id', realProjectId)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (repoFetch) {
-      repoRecord = repoFetch;
-    } else {
-      const cleanSlug = (projectRecord.slug || projectRecord.name || 'owner/repo').replace('github-', '');
-      const parts = cleanSlug.split('/');
-      const ownerLogin = parts[0] || 'owner';
-      const repoNamePart = parts[1] || parts[0] || 'repo';
-      const fullName = `${ownerLogin}/${repoNamePart}`;
-
-      const { data: newRepo } = await supabase
+    if (patchRecord.repository_id && isValidUUID(patchRecord.repository_id)) {
+      const { data: rById } = await supabase
         .from('repositories')
-        .insert({
-          project_id: realProjectId,
-          github_id: Math.floor(Math.random() * 100000000),
-          full_name: fullName,
-          owner_login: ownerLogin,
-          repo_name: repoNamePart,
-          default_branch: 'main',
-          html_url: `https://github.com/${fullName}`
-        })
-        .select('id, github_id, full_name, owner_login, repo_name, default_branch')
-        .single();
+        .select('id, project_id, github_id, full_name, owner_login, repo_name, default_branch')
+        .eq('id', patchRecord.repository_id)
+        .eq('project_id', realProjectId)
+        .maybeSingle();
+      if (rById) repoRecord = rById;
+    }
 
-      if (newRepo) {
-        repoRecord = newRepo;
-      } else {
-        return NextResponse.json({ error: 'Repository not found for this project' }, { status: 404 });
+    if (!repoRecord) {
+      const { data: repoFetch } = await supabase
+        .from('repositories')
+        .select('id, project_id, github_id, full_name, owner_login, repo_name, default_branch')
+        .eq('project_id', realProjectId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (repoFetch) {
+        repoRecord = repoFetch;
       }
     }
 
-    // 3. Verify repository metadata is complete (owner_login and repo_name)
+    if (!repoRecord) {
+      return NextResponse.json({ error: 'Repository not found for this project' }, { status: 404 });
+    }
+
+    // Verify repository metadata is complete (owner_login and repo_name)
     if (!repoRecord.owner_login || !repoRecord.repo_name) {
       return NextResponse.json({ error: 'GitHub repository metadata is incomplete' }, { status: 400 });
     }
@@ -157,56 +136,7 @@ export async function POST(req: Request) {
     const repo = repoRecord.repo_name;
     const defaultBranch = repoRecord.default_branch || 'main';
 
-    // 4. Verify investigation exists
-    if (!investigation_id) {
-      return NextResponse.json({ error: 'Investigation not found' }, { status: 404 });
-    }
-
-    const { data: investigationRecord, error: investigationError } = await supabase
-      .from('investigations')
-      .select('id, incident_id')
-      .eq('id', investigation_id)
-      .maybeSingle();
-
-    if (investigationError || !investigationRecord) {
-      return NextResponse.json({ error: 'Investigation not found' }, { status: 404 });
-    }
-
-    // Verify investigation's associated incident belongs to the project
-    if (investigationRecord.incident_id) {
-      const { data: incidentRecord, error: incidentError } = await supabase
-        .from('incidents')
-        .select('id, project_id')
-        .eq('id', investigationRecord.incident_id)
-        .maybeSingle();
-
-      if (incidentRecord && incidentRecord.project_id !== realProjectId) {
-        return NextResponse.json({ error: 'Unauthorized: Investigation does not belong to your project' }, { status: 403 });
-      }
-    }
-
-    // 5. Verify patch exists
-    const { data: patchRecord, error: patchError } = await supabase
-      .from('patches')
-      .select('id, repository_id, investigation_id, file_path, original_content, updated_content, unified_diff, explanation')
-      .eq('investigation_id', investigation_id)
-      .maybeSingle();
-
-    if (patchError || !patchRecord) {
-      return NextResponse.json({ error: 'Patch not found' }, { status: 404 });
-    }
-
-    // Verify patch repository matches the selected repository UUID (repositories.id)
-    if (patchRecord.repository_id !== repoRecord.id) {
-      return NextResponse.json({ error: 'Patch repository mismatch' }, { status: 400 });
-    }
-
-    // Verify patch investigation matches the investigation ID
-    if (patchRecord.investigation_id !== investigation_id) {
-      return NextResponse.json({ error: 'Patch investigation mismatch' }, { status: 400 });
-    }
-
-    // 6. Verify GitHub connection exists and retrieve the token
+    // 4. Verify GitHub connection exists and retrieve the token
     let token = await getStoredGitHubToken(user.id, supabase);
     if (!token) {
       const { data: { session } } = await supabase.auth.getSession();
@@ -408,7 +338,8 @@ export async function POST(req: Request) {
 
         if (!dbPR) {
           await supabase.from('pull_requests').insert({
-            investigation_id: investigation_id,
+            investigation_id: targetInvestigationId,
+            patch_id: patchRecord.id,
             repository_id: repoRecord.id, // repositories.id UUID, not github_id
             github_pr_id: matchedPR.id,
             github_pr_number: matchedPR.number,
@@ -543,7 +474,8 @@ export async function POST(req: Request) {
 
             if (!dbPR) {
               await supabase.from('pull_requests').insert({
-                investigation_id: investigation_id,
+                investigation_id: targetInvestigationId,
+                patch_id: patchRecord.id,
                 repository_id: repoRecord.id,
                 github_pr_id: existingGitHubPR.id,
                 github_pr_number: existingGitHubPR.number,
@@ -600,7 +532,8 @@ export async function POST(req: Request) {
     const { data: prRecord, error: prInsertError } = await supabase
       .from('pull_requests')
       .insert({
-        investigation_id: investigation_id,
+        investigation_id: targetInvestigationId,
+        patch_id: patchRecord.id,
         repository_id: repoRecord.id, // repositories.id UUID, not github_id
         github_pr_id: prData.id,
         github_pr_number: prData.number,

@@ -282,9 +282,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       patch_id: patch.id,
+      patchId: patch.id,
       investigation_id: investigation.id,
+      investigationId: investigation.id,
       project_id: realProjectId,
-      repository_id: repoId
+      projectId: realProjectId,
+      repository_id: repoId,
+      repositoryId: repoId
     });
 
   } catch (error: any) {

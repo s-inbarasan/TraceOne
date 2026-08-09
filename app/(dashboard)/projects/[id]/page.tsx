@@ -83,8 +83,12 @@ export default function ProjectWorkspacePage({ params }: { params: Promise<{ id:
     filePath: string
     original: string
     modified: string
+    investigationId?: string
     investigation_id?: string
+    patchId?: string
     patch_id?: string
+    repositoryId?: string
+    repository_id?: string
   } | null>(null)
   const [copied, setCopied] = useState(false)
   const [prCreated, setPrCreated] = useState(false)
@@ -246,8 +250,12 @@ export default function ProjectWorkspacePage({ params }: { params: Promise<{ id:
           filePath: patch.file_path,
           original: patch.original_content,
           modified: patch.updated_content,
+          investigationId: investigation.id,
           investigation_id: investigation.id,
-          patch_id: patch.id
+          patchId: patch.id,
+          patch_id: patch.id,
+          repositoryId: patch.repository_id,
+          repository_id: patch.repository_id
         })
 
         // 5. Fetch pull request metadata if already created
@@ -523,8 +531,19 @@ export default function ProjectWorkspacePage({ params }: { params: Promise<{ id:
             })
           })
           const patchData = await patchRes.json()
-          if (patchData.success && patchData.investigation_id) {
-            setDiffState(prev => prev ? { ...prev, investigation_id: patchData.investigation_id, patch_id: patchData.patch_id } : prev)
+          if (patchData.success && (patchData.patchId || patchData.patch_id)) {
+            const pId = patchData.patchId || patchData.patch_id
+            const invId = patchData.investigationId || patchData.investigation_id
+            const rId = patchData.repositoryId || patchData.repository_id
+            setDiffState(prev => prev ? {
+              ...prev,
+              patchId: pId,
+              patch_id: pId,
+              investigationId: invId,
+              investigation_id: invId,
+              repositoryId: rId,
+              repository_id: rId
+            } : prev)
           }
         } catch (patchErr) {
           console.error("Patch store error:", patchErr)
@@ -615,8 +634,19 @@ export default function ProjectWorkspacePage({ params }: { params: Promise<{ id:
           })
         })
         const patchData = await patchRes.json()
-        if (patchData.success && patchData.investigation_id) {
-          setDiffState(prev => prev ? { ...prev, investigation_id: patchData.investigation_id, patch_id: patchData.patch_id } : prev)
+        if (patchData.success && (patchData.patchId || patchData.patch_id)) {
+          const pId = patchData.patchId || patchData.patch_id
+          const invId = patchData.investigationId || patchData.investigation_id
+          const rId = patchData.repositoryId || patchData.repository_id
+          setDiffState(prev => prev ? {
+            ...prev,
+            patchId: pId,
+            patch_id: pId,
+            investigationId: invId,
+            investigation_id: invId,
+            repositoryId: rId,
+            repository_id: rId
+          } : prev)
         }
       } catch (patchErr) {
         console.error("Patch store error:", patchErr)
@@ -635,17 +665,18 @@ export default function ProjectWorkspacePage({ params }: { params: Promise<{ id:
     setPrError(null)
 
     try {
-      let currentInvestigationId = (diffState as any)?.investigation_id
+      let targetPatchId = diffState?.patchId || diffState?.patch_id;
+      let targetInvestigationId = diffState?.investigationId || diffState?.investigation_id;
+      let targetRepositoryId = diffState?.repositoryId || diffState?.repository_id || project?.repositories?.[0]?.id;
 
-      if (!currentInvestigationId && (project?.id || projectId)) {
+      if (!targetPatchId && (project?.id || projectId)) {
         try {
-          const repoId = project?.repositories?.[0]?.id
           const patchRes = await fetch('/api/patches', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               project_id: project?.id || projectId,
-              repository_id: repoId,
+              repository_id: targetRepositoryId,
               file_path: diffState?.filePath || selectedFile || 'src/controllers/analytics.ts',
               original_content: diffState?.original || '',
               updated_content: diffState?.modified || '',
@@ -654,24 +685,32 @@ export default function ProjectWorkspacePage({ params }: { params: Promise<{ id:
             })
           })
           const patchData = await patchRes.json()
-          if (patchData.success && patchData.investigation_id) {
-            currentInvestigationId = patchData.investigation_id
+          if (patchData.success && (patchData.patchId || patchData.patch_id)) {
+            targetPatchId = patchData.patchId || patchData.patch_id
+            targetInvestigationId = patchData.investigationId || patchData.investigation_id
+            targetRepositoryId = patchData.repositoryId || patchData.repository_id || targetRepositoryId
             setDiffState(prev => prev ? {
               ...prev,
-              investigation_id: patchData.investigation_id,
-              patch_id: patchData.patch_id
+              patchId: targetPatchId,
+              patch_id: targetPatchId,
+              investigationId: targetInvestigationId,
+              investigation_id: targetInvestigationId,
+              repositoryId: targetRepositoryId,
+              repository_id: targetRepositoryId
             } : prev)
           } else {
-            throw new Error(patchData.error || "Could not persist investigation before creating PR.")
+            throw new Error(patchData.error || "Could not persist patch before creating PR.")
           }
         } catch (err: any) {
           setIsSubmittingPr(false)
           setPrStatusText("failed")
-          setPrError(err.message || "Failed to persist investigation.")
-          addNotification("Pull Request Failed", err.message || "Failed to persist investigation.", "error")
+          setPrError(err.message || "Failed to persist patch.")
+          addNotification("Pull Request Failed", err.message || "Failed to persist patch.", "error")
           return
         }
       }
+
+      console.log("[Submit PR] patchId:", targetPatchId);
 
       const res = await fetch('/api/github/pull-request', {
         method: 'POST',
@@ -687,7 +726,12 @@ export default function ProjectWorkspacePage({ params }: { params: Promise<{ id:
               content: diffState?.modified || fileContents[selectedFile] || ''
             }
           ],
-          investigation_id: currentInvestigationId
+          patchId: targetPatchId,
+          patch_id: targetPatchId,
+          investigationId: targetInvestigationId,
+          investigation_id: targetInvestigationId,
+          repositoryId: targetRepositoryId,
+          repository_id: targetRepositoryId
         })
       });
       const data = await res.json();
