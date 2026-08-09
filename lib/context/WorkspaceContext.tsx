@@ -310,19 +310,21 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
           const { data: dbProjects } = await supabase.from("projects").select("*, repositories(*)")
           if (dbProjects && dbProjects.length > 0) {
             const mapped: Project[] = dbProjects.map(p => {
-              const repo = p.repositories?.[0]
-              const repoFullName = repo?.full_name || (p.slug.startsWith("github-") ? p.slug.replace("github-", "").replace("-", "/") : undefined)
+              if (!p) return null;
+              const repoList = Array.isArray(p.repositories) ? p.repositories : [];
+              const repo = repoList[0];
+              const repoFullName = repo?.full_name || (p.slug && typeof p.slug === "string" && p.slug.startsWith("github-") ? p.slug.replace("github-", "").replace("-", "/") : undefined);
               return {
                 id: p.id,
                 name: p.name,
                 slug: p.slug,
                 source_type: "github",
                 repository: repoFullName,
-                repositories: p.repositories || [],
+                repositories: repoList,
                 status: "healthy",
                 created_at: p.created_at,
               }
-            })
+            }).filter((item): item is Project => item !== null)
             // Merge or use DB projects
             setProjects(prev => {
               const prevMap = new Map(prev.map(item => [item.id, item]))

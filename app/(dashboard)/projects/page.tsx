@@ -297,10 +297,13 @@ function ProjectsContent() {
     }
   };
 
-  const filteredRepos = repos.filter(
+  const filteredRepos = (repos || []).filter(
     (repo) =>
-      repo.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      repo.name.toLowerCase().includes(searchQuery.toLowerCase())
+      repo &&
+      repo.full_name &&
+      repo.name &&
+      (repo.full_name.toLowerCase().includes((searchQuery || "").toLowerCase()) ||
+        repo.name.toLowerCase().includes((searchQuery || "").toLowerCase()))
   );
 
   if (loading) {
@@ -345,9 +348,17 @@ function ProjectsContent() {
         </div>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {projects.map((project) => {
-            const repoData = project.repositories?.[0];
+          {(projects || []).map((project) => {
+            if (!project) return null;
+            const repoList = Array.isArray(project.repositories) ? project.repositories : [];
+            const repoData = repoList[0];
             const isSyncingThis = syncingProjectId === project.id;
+
+            const incidentCount = Array.isArray(project.incidents)
+              ? (project.incidents[0]?.count ?? 0)
+              : typeof project.incidents === "object" && project.incidents !== null
+              ? ((project.incidents as any).count ?? 0)
+              : 0;
 
             return (
               <Card
@@ -358,10 +369,10 @@ function ProjectsContent() {
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between gap-2">
                     <div className="space-y-1 min-w-0">
-                      <CardTitle className="text-base truncate">{project.name}</CardTitle>
+                      <CardTitle className="text-base truncate">{project.name || "Unnamed Project"}</CardTitle>
                       <CardDescription className="flex items-center gap-1.5 text-xs">
                         <GitBranch className="size-3.5 shrink-0 text-primary" />
-                        <span className="truncate">{repoData?.full_name || project.repository || project.name}</span>
+                        <span className="truncate">{repoData?.full_name || project.repository || project.name || "N/A"}</span>
                       </CardDescription>
                     </div>
                     <div className="flex items-center gap-1.5 shrink-0">
@@ -409,10 +420,10 @@ function ProjectsContent() {
 
                   <div className="flex items-center justify-between text-xs text-muted-foreground pt-1 border-t border-border/40">
                     <div className="flex items-center gap-1.5 font-medium">
-                      {(project.incidents?.[0]?.count ?? 0) > 0 ? (
+                      {incidentCount > 0 ? (
                         <span className="flex items-center gap-1 text-warning">
                           <AlertCircle className="size-3.5" />
-                          {project.incidents?.[0]?.count} Open Incidents
+                          {incidentCount} Open {incidentCount === 1 ? "Incident" : "Incidents"}
                         </span>
                       ) : (
                         <span className="flex items-center gap-1 text-success">
@@ -421,7 +432,11 @@ function ProjectsContent() {
                         </span>
                       )}
                     </div>
-                    <span>{new Date(project.created_at).toLocaleDateString()}</span>
+                    <span>
+                      {project.created_at && !isNaN(Date.parse(project.created_at))
+                        ? new Date(project.created_at).toLocaleDateString()
+                        : "N/A"}
+                    </span>
                   </div>
                 </CardContent>
               </Card>
@@ -526,10 +541,15 @@ function ProjectsContent() {
                 ) : (
                   <div className="p-1 space-y-1">
                     {filteredRepos.map((repo) => {
+                      if (!repo) return null;
                       const isSelected = selectedRepo?.id === repo.id;
-                      const alreadyLinkedProject = projects.find((p) => {
-                        const linkedName = p.repositories?.[0]?.full_name || p.repository;
-                        return linkedName ? linkedName.toLowerCase() === repo.full_name.toLowerCase() : false;
+                      const alreadyLinkedProject = (projects || []).find((p) => {
+                        if (!p) return false;
+                        const repoList = Array.isArray(p.repositories) ? p.repositories : [];
+                        const linkedName = repoList[0]?.full_name || p.repository;
+                        return linkedName && repo.full_name
+                          ? linkedName.toLowerCase() === repo.full_name.toLowerCase()
+                          : false;
                       });
 
                       return (
