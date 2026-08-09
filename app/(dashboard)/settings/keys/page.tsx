@@ -25,7 +25,8 @@ export default function ApiKeysPage() {
       
       if (data.success) {
         // Exclude GitHub since it's handled via OAuth, we only want AI providers here
-        setProviders(data.providers.filter((p: any) => p.name.toLowerCase() !== 'github'))
+        const rawProviders = data.providers || []
+        setProviders(rawProviders.filter((p: any) => p && p.name && p.name.toLowerCase() !== 'github'))
         
         const keyMap: Record<string, any> = {}
         if (data.keys) {

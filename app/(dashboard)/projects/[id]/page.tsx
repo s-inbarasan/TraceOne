@@ -356,12 +356,13 @@ export default function ProjectWorkspacePage({ params }: { params: Promise<{ id:
         const data = await res.json()
         if (data.success && data.keys) {
           const configuredProviderIds = data.keys.map((k: any) => k.provider_id)
-          const configured = data.providers.filter((p: any) => configuredProviderIds.includes(p.id))
+          const rawProviders = data.providers || []
+          const configured = rawProviders.filter((p: any) => p && p.id && configuredProviderIds.includes(p.id))
           setConfiguredProviders(configured)
           
-          if (configured.length > 0 && (!selectedModel || !configured.some((p: any) => p.name.toLowerCase() === selectedModel.toLowerCase()))) {
+          if (configured.length > 0 && (!selectedModel || !configured.some((p: any) => p && p.name && p.name.toLowerCase() === selectedModel.toLowerCase()))) {
             // Pick default based on first configured provider
-            const geminiFirst = configured.find((p: any) => p.name.toLowerCase() === 'gemini')
+            const geminiFirst = configured.find((p: any) => p && p.name && p.name.toLowerCase() === 'gemini')
             if (geminiFirst) {
               setSelectedModel(geminiFirst.name)
             } else {

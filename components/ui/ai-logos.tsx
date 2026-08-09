@@ -83,3 +83,15 @@ export function NvidiaLogo(props: React.SVGProps<SVGSVGElement>) {
     </svg>
   )
 }
+
+export function GroqLogo(props: React.ImgHTMLAttributes<HTMLImageElement>) {
+  return (
+    <img 
+      src="https://upload.wikimedia.org/wikipedia/commons/e/e0/Groq_logo.svg" 
+      alt="Groq" 
+      referrerPolicy="no-referrer"
+      {...props} 
+    />
+  )
+}
+
