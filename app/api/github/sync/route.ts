@@ -6,18 +6,22 @@ export async function POST(req: NextRequest) {
   try {
     const authHeader = req.headers.get("authorization");
     let supabase: any;
+    let userResponse;
 
     if (authHeader) {
       supabase = getSupabaseClient(authHeader);
+      const token = authHeader.replace("Bearer ", "");
+      userResponse = await supabase.auth.getUser(token);
     } else {
       supabase = await createClient();
+      userResponse = await supabase.auth.getUser();
     }
 
     if (!supabase) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    const { data: { user }, error: userError } = userResponse;
     if (userError || !user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
