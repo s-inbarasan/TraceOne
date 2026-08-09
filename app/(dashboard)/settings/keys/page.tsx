@@ -118,12 +118,12 @@ export default function ApiKeysPage() {
               <CardHeader className="flex flex-row items-center justify-between pb-4">
                 <div className="space-y-1">
                   <CardTitle className="text-base flex items-center gap-2">
-                    {provider.name.toLowerCase().includes('gemini') && <div className="size-5 rounded-full bg-blue-500/10 flex items-center justify-center"><GeminiLogo className="size-3.5" /></div>}
-                    {provider.name.toLowerCase().includes('openai') && <div className="size-5 rounded-full bg-emerald-500/10 text-emerald-500 flex items-center justify-center"><OpenAILogo className="size-3.5" /></div>}
-                    {provider.name.toLowerCase().includes('anthropic') && <div className="size-5 rounded-full bg-amber-500/10 text-amber-500 flex items-center justify-center"><AnthropicLogo className="size-3.5" /></div>}
-                    {provider.name.toLowerCase().includes('nvidia') && <div className="size-5 rounded-full bg-green-500/10 text-green-500 flex items-center justify-center"><NvidiaLogo className="size-3.5" /></div>}
-                    {provider.name.toLowerCase().includes('groq') && <div className="size-5 rounded-full bg-red-500/10 text-red-500 flex items-center justify-center"><GroqLogo className="size-3.5" /></div>}
-                    {provider.name}
+                    {provider.name.toLowerCase().includes('gemini') && <GeminiLogo className="size-6 flex-shrink-0" />}
+                    {provider.name.toLowerCase().includes('openai') && <OpenAILogo className="size-6 flex-shrink-0" />}
+                    {provider.name.toLowerCase().includes('anthropic') && <AnthropicLogo className="size-6 flex-shrink-0" />}
+                    {provider.name.toLowerCase().includes('nvidia') && <NvidiaLogo className="size-6 flex-shrink-0" />}
+                    {provider.name.toLowerCase().includes('groq') && <GroqLogo className="size-6 flex-shrink-0" />}
+                    <span>{provider.name}</span>
                     {isConfigured ? (
                       <Badge variant="default" className="text-[10px] h-5 px-1.5 flex items-center gap-1 bg-green-500/10 text-green-500 hover:bg-green-500/20 border-green-500/20">
                         <CheckCircle2 className="size-3" /> Connected

@@ -29,6 +29,16 @@
   --radius-md: 0.875rem; /* 14px as requested */
   --radius-lg: 1rem;
   --font-sans: "Inter", sans-serif;
+  --animate-marquee: marquee 30s linear infinite;
+
+  @keyframes marquee {
+    from {
+      transform: translateX(0%);
+    }
+    to {
+      transform: translateX(-33.33%);
+    }
+  }
 }
 
 @layer base {

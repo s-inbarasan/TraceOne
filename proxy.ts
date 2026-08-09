@@ -37,7 +37,11 @@ export async function proxy(request: NextRequest) {
 
     // Define protected and auth routes
     const isAuthRoute = request.nextUrl.pathname.startsWith('/login') || request.nextUrl.pathname.startsWith('/auth')
-    const isMarketingRoute = request.nextUrl.pathname === '/' || request.nextUrl.pathname.startsWith('/#')
+    const isMarketingRoute = 
+      request.nextUrl.pathname === '/' || 
+      request.nextUrl.pathname.startsWith('/#') || 
+      request.nextUrl.pathname.startsWith('/privacy') || 
+      request.nextUrl.pathname.startsWith('/terms')
 
     if (!user && !isAuthRoute && !isMarketingRoute) {
       // Redirect unauthenticated users to login if they try to access protected routes

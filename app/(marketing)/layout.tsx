@@ -10,17 +10,21 @@ export default function MarketingLayout({
     <div className="flex min-h-screen flex-col bg-background">
       <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container mx-auto flex h-14 max-w-7xl items-center px-6">
-          <Link href="/" className="flex items-center gap-2 font-semibold">
-            <div className="flex size-7 items-center justify-center rounded-md bg-primary text-primary-foreground shadow-sm">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="size-4"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.29 7 12 12 20.71 7"></polyline><line x1="12" y1="22" x2="12" y2="12"></line></svg>
-            </div>
-            <span className="tracking-tight">Trace One</span>
+          <Link href="/" className="flex items-center gap-2.5 font-bold tracking-tight">
+            <img 
+              src="https://od.lk/s/OTNfMzY2MDI0MjZfWVBJV0k/TRACE-ONE-logo.png" 
+              alt="Trace One" 
+              className="h-7 w-auto object-contain bg-transparent"
+            />
+            <span className="text-base font-black tracking-wider text-foreground">
+              TRACE <span className="text-primary font-black">ONE</span>
+            </span>
           </Link>
           <div className="flex flex-1 items-center justify-end gap-4">
             <nav className="flex items-center gap-4 text-sm font-medium text-muted-foreground">
-              <Link href="#features" className="hover:text-foreground">Features</Link>
-              <Link href="#how-it-works" className="hover:text-foreground">How it Works</Link>
-              <Link href="#security" className="hover:text-foreground">Security</Link>
+              <Link href="/#features" className="hover:text-foreground">Features</Link>
+              <Link href="/#how-it-works" className="hover:text-foreground">How it Works</Link>
+              <Link href="/#security" className="hover:text-foreground">Security</Link>
             </nav>
             <div className="flex items-center gap-2">
               <Button variant="ghost" size="sm" asChild>
@@ -40,9 +44,9 @@ export default function MarketingLayout({
             Built for modern engineering teams.
           </p>
           <div className="flex items-center gap-4 text-sm text-muted-foreground">
-            <Link href="#" className="hover:text-foreground">Terms</Link>
-            <Link href="#" className="hover:text-foreground">Privacy</Link>
-            <Link href="#" className="hover:text-foreground">GitHub</Link>
+            <Link href="/terms" className="hover:text-foreground">Terms</Link>
+            <Link href="/privacy" className="hover:text-foreground">Privacy</Link>
+            <Link href="https://github.com" target="_blank" rel="noopener noreferrer" className="hover:text-foreground">GitHub</Link>
           </div>
         </div>
       </footer>

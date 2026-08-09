@@ -75,20 +75,16 @@ export function Sidebar() {
     >
       {/* Brand Header */}
       <div className="flex h-14 items-center justify-between border-b border-border px-4">
-        <Link href="/dashboard" className="flex items-center gap-2.5 overflow-hidden">
-          <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-md">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="size-4.5"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.29 7 12 12 20.71 7"></polyline><line x1="12" y1="22" x2="12" y2="12"></line></svg>
-          </div>
+        <Link href="/dashboard" className="flex items-center gap-2.5 overflow-hidden py-1">
+          <img 
+            src="https://od.lk/s/OTNfMzY2MDI0MjZfWVBJV0k/TRACE-ONE-logo.png" 
+            alt="Trace One" 
+            className={cn("h-7 w-auto object-contain bg-transparent transition-all", sidebarCollapsed ? "max-w-[36px]" : "max-w-[36px]")}
+          />
           {!sidebarCollapsed && (
-            <motion.span 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.15 }}
-              className="font-bold tracking-tight text-foreground text-sm"
-            >
-              Trace One
-            </motion.span>
+            <span className="text-sm font-black tracking-wider text-foreground whitespace-nowrap">
+              TRACE <span className="text-primary font-black">ONE</span>
+            </span>
           )}
         </Link>
         

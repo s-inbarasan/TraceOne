@@ -31,14 +31,6 @@ export default function LoginPage() {
   // New state variables
   const [showPassword, setShowPassword] = useState(false);
 
-  const handleGuestSignIn = () => {
-    setLoading(true);
-    if (typeof window !== "undefined") {
-      localStorage.setItem("trace_guest_user", "true");
-    }
-    router.push("/dashboard");
-  };
-
   // Password criteria check
   const hasMinLength = password.length >= 8;
   const hasUppercase = /[A-Z]/.test(password);
@@ -131,22 +123,13 @@ export default function LoginPage() {
         <CardHeader className="space-y-1 text-center">
           <Link
             href="/"
-            className="mx-auto mb-4 flex size-12 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm"
+            className="mx-auto mb-4 flex items-center justify-center"
           >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="size-6"
-            >
-              <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
-              <polyline points="3.29 7 12 12 20.71 7"></polyline>
-              <line x1="12" y1="22" x2="12" y2="12"></line>
-            </svg>
+            <img 
+              src="https://od.lk/s/OTNfMzY2MDI0MjZfWVBJV0k/TRACE-ONE-logo.png" 
+              alt="Trace One" 
+              className="h-9 w-auto object-contain bg-transparent"
+            />
           </Link>
           <CardTitle className="text-2xl font-bold tracking-tight">
             Welcome to Trace One
@@ -176,16 +159,6 @@ export default function LoginPage() {
               Continue with GitHub (Recommended)
             </Button>
 
-            <Button
-              size="lg"
-              variant="outline"
-              className="w-full gap-2 font-medium border-primary/30 text-primary hover:bg-primary/5 cursor-pointer"
-              onClick={handleGuestSignIn}
-              disabled={loading}
-            >
-              <Bot className="size-5" />
-              Sign In as Guest (Demo Sandbox)
-            </Button>
 
             <p className="text-xs text-center text-muted-foreground">
               Automatic repository discovery, instant analysis, and Pull Request

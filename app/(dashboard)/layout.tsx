@@ -1,5 +1,6 @@
 import { Sidebar } from '@/components/layout/sidebar';
 import { Header } from '@/components/layout/header';
+import { ScrollRestorationArea } from '@/components/layout/scroll-restoration';
 
 export default function DashboardLayout({
   children,
@@ -11,11 +12,11 @@ export default function DashboardLayout({
       <Sidebar />
       <div className="flex flex-1 flex-col overflow-hidden">
         <Header />
-        <main className="flex-1 overflow-y-auto bg-background">
+        <ScrollRestorationArea className="flex-1 overflow-y-auto bg-background">
           <div className="mx-auto max-w-7xl p-6">
             {children}
           </div>
-        </main>
+        </ScrollRestorationArea>
       </div>
     </div>
   );

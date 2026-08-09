@@ -5,6 +5,14 @@ import './globals.css';
 export const metadata: Metadata = {
   title: 'Trace One',
   description: 'AI-powered API observability & resolution platform',
+  icons: {
+    icon: 'https://od.lk/s/OTNfMzY2MDI0MzFfU05MNEI/TRACE-ONE-logo-300kb.png',
+    shortcut: 'https://od.lk/s/OTNfMzY2MDI0MzFfU05MNEI/TRACE-ONE-logo-300kb.png',
+    apple: 'https://od.lk/s/OTNfMzY2MDI0MzFfU05MNEI/TRACE-ONE-logo-300kb.png',
+  },
+  openGraph: {
+    images: ['https://od.lk/s/OTNfMzY2MDI0MzFfU05MNEI/TRACE-ONE-logo-300kb.png'],
+  },
 };
 
 export default function RootLayout({

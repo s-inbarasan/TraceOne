@@ -38,24 +38,24 @@ import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
 import { GeminiLogo, OpenAILogo, AnthropicLogo, NvidiaLogo, GroqLogo } from "@/components/ui/ai-logos"
 
-function getModelProviderIcon(modelName: string) {
+function getModelProviderIcon(modelName: string, className = "size-3.5") {
   const model = modelName.toLowerCase();
   if (model.includes('gemini')) {
-    return <GeminiLogo className="size-3.5" />
+    return <GeminiLogo className={className} />
   }
   if (model.includes('gpt') || model.includes('openai')) {
-    return <OpenAILogo className="size-3.5 text-emerald-500" />
+    return <OpenAILogo className={className} />
   }
   if (model.includes('claude') || model.includes('anthropic')) {
-    return <AnthropicLogo className="size-3.5 text-amber-500" />
+    return <AnthropicLogo className={className} />
   }
   if (model.includes('nvidia') || model.includes('llama-3.1-405b')) {
-    return <NvidiaLogo className="size-3.5 text-green-500" />
+    return <NvidiaLogo className={className} />
   }
   if (model.includes('groq') || model.includes('70b-versatile')) {
-    return <GroqLogo className="size-3.5 text-red-500" />
+    return <GroqLogo className={className} />
   }
-  return <Bot className="size-3.5 text-muted-foreground" />
+  return <Bot className={className} />
 }
 
 export default function ProjectWorkspacePage({ params }: { params: Promise<{ id: string }> }) {
@@ -79,6 +79,12 @@ export default function ProjectWorkspacePage({ params }: { params: Promise<{ id:
   const [selectedFile, setSelectedFile] = useState<string>("src/controllers/analytics.ts")
   const [promptInput, setPromptInput] = useState("")
   const [isGenerating, setIsGenerating] = useState(false)
+  
+  const chatScrollRef = useRef<HTMLDivElement>(null)
+  const chatContainerRef = useRef<HTMLDivElement>(null)
+  const isUserScrolling = useRef(false)
+  const previousMessagesLength = useRef(0)
+
   const [diffState, setDiffState] = useState<{
     filePath: string
     original: string
@@ -98,6 +104,7 @@ export default function ProjectWorkspacePage({ params }: { params: Promise<{ id:
   const [prStatusText, setPrStatusText] = useState<"idle" | "creating" | "created" | "exists" | "failed">("idle")
   const [configuredProviders, setConfiguredProviders] = useState<any[]>([])
   const [keysLoaded, setKeysLoaded] = useState(false)
+  const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false)
 
   const [filePaths, setFilePaths] = useState<string[]>([])
   const [fileContents, setFileContents] = useState<Record<string, string>>({})
@@ -371,6 +378,45 @@ export default function ProjectWorkspacePage({ params }: { params: Promise<{ id:
     fetchKeys()
   }, [])
 
+
+  // Add effect to scroll to bottom on new messages or initial load
+  useEffect(() => {
+    const scrollToBottom = (force = false) => {
+      if (!chatScrollRef.current || !chatContainerRef.current) return;
+      
+      const container = chatContainerRef.current;
+      const isAtBottom = container.scrollHeight - container.scrollTop <= container.clientHeight + 100;
+      
+      // Auto-scroll if: we're already near bottom, or it's forced (initial load/tab switch), or a new user message just sent
+      if (isAtBottom || force) {
+        chatScrollRef.current.scrollIntoView({ behavior: force ? "instant" : "smooth" });
+      }
+    };
+
+    // If chat tab is active, we might need to scroll
+    if (activeTab === "chat") {
+      const messagesCount = messages?.length || 0;
+      
+      // First time loading messages or switching to chat tab
+      if (previousMessagesLength.current === 0 && messagesCount > 0) {
+        // Use timeout to let DOM render first
+        setTimeout(() => scrollToBottom(true), 10);
+      } else if (messagesCount > previousMessagesLength.current) {
+        // New message arrived
+        setTimeout(() => scrollToBottom(), 10);
+      }
+      
+      previousMessagesLength.current = messagesCount;
+    }
+  }, [messages, activeTab]);
+
+  const handleChatScroll = () => {
+    if (!chatContainerRef.current) return;
+    const container = chatContainerRef.current;
+    // Check if user scrolled up
+    const isAtBottom = container.scrollHeight - container.scrollTop <= container.clientHeight + 100;
+    isUserScrolling.current = !isAtBottom;
+  };
 
   // Find project
   useEffect(() => {
@@ -996,7 +1042,7 @@ export default function ProjectWorkspacePage({ params }: { params: Promise<{ id:
                   <span>Model Provider</span>
                   {selectedModel && (
                     <div className="flex items-center gap-1 font-semibold text-[10px] text-foreground bg-secondary px-1.5 py-0.5 rounded">
-                      {getModelProviderIcon(selectedModel)}
+                      {getModelProviderIcon(selectedModel, "size-4 flex-shrink-0")}
                       <span>{selectedModel === 'Gemini' ? 'Google Gemini' : selectedModel}</span>
                     </div>
                   )}
@@ -1009,19 +1055,44 @@ export default function ProjectWorkspacePage({ params }: { params: Promise<{ id:
                     </Link>
                   </div>
                 ) : (
-                  <select
-                    value={selectedModel}
-                    onChange={(e) => setSelectedModel(e.target.value)}
-                    className="w-full h-8 rounded-md border border-border bg-background px-2 text-xs font-medium text-foreground outline-none focus:border-primary"
-                    disabled={!keysLoaded}
-                  >
-                    {!keysLoaded && <option>Loading...</option>}
-                    {configuredProviders.map((p: any) => (
-                      <option key={p.id} value={p.name}>
-                        {p.name === 'Gemini' ? 'Google Gemini' : p.name}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setIsModelDropdownOpen(!isModelDropdownOpen)}
+                      className="flex items-center justify-between w-full h-9 rounded-md border border-border bg-background px-3 text-xs font-medium text-foreground outline-none focus:border-primary cursor-pointer hover:bg-accent/50 disabled:opacity-50"
+                      disabled={!keysLoaded}
+                    >
+                      <div className="flex items-center gap-2">
+                        {selectedModel ? getModelProviderIcon(selectedModel, "size-5 flex-shrink-0") : <Bot className="size-5 text-muted-foreground flex-shrink-0" />}
+                        <span>{selectedModel === 'Gemini' ? 'Google Gemini' : selectedModel || 'Select Model...'}</span>
+                      </div>
+                      <ChevronDown className="size-4 text-muted-foreground" />
+                    </button>
+                    {isModelDropdownOpen && (
+                      <>
+                        <div 
+                          className="fixed inset-0 z-40" 
+                          onClick={() => setIsModelDropdownOpen(false)} 
+                        />
+                        <div className="absolute right-0 left-0 mt-1 max-h-60 overflow-y-auto rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-lg z-50 animate-in fade-in-50 slide-in-from-top-1">
+                          {configuredProviders.map((p: any) => (
+                            <button
+                              key={p.id}
+                              type="button"
+                              onClick={() => {
+                                setSelectedModel(p.name);
+                                setIsModelDropdownOpen(false);
+                              }}
+                              className="flex items-center gap-2 w-full px-2 py-1.5 text-xs text-left rounded-sm outline-none hover:bg-accent hover:text-accent-foreground cursor-pointer"
+                            >
+                              {getModelProviderIcon(p.name, "size-5 flex-shrink-0")}
+                              <span>{p.name === 'Gemini' ? 'Google Gemini' : p.name}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </div>
                 )}
               </div>
               <p className="text-[10px] text-muted-foreground leading-relaxed">
@@ -1068,7 +1139,11 @@ export default function ProjectWorkspacePage({ params }: { params: Promise<{ id:
                     {selectedModel}
                   </Badge>
                 </CardHeader>
-                <CardContent className="p-4 flex-1 overflow-y-auto space-y-4 font-sans text-xs">
+                <CardContent 
+                  className="p-4 flex-1 overflow-y-auto space-y-4 font-sans text-xs"
+                  ref={chatContainerRef}
+                  onScroll={handleChatScroll}
+                >
                   {messages.map((m, idx) => (
                     <div 
                       key={m.id || idx}
@@ -1094,9 +1169,10 @@ export default function ProjectWorkspacePage({ params }: { params: Promise<{ id:
                       Trace One is analyzing codebase AST and stack trace context...
                     </div>
                   )}
+                  <div ref={chatScrollRef} />
                 </CardContent>
                 <div className="p-3 border-t border-border bg-background">
-                  <form onSubmit={handleSendMessage} className="flex gap-2">
+                  <form onSubmit={handleSendMessage} className="flex gap-2 mb-2">
                     <Input 
                       placeholder={keysLoaded && configuredProviders.length === 0 ? "Configure AI provider to start chatting" : "Ask AI to explain error, refactor function, or generate patch..."}
                       value={promptInput}
@@ -1108,6 +1184,9 @@ export default function ProjectWorkspacePage({ params }: { params: Promise<{ id:
                       <Send className="size-3.5" />
                     </Button>
                   </form>
+                  <p className="text-[10px] text-center text-muted-foreground opacity-60">
+                    AI can make mistakes. Verify important information. {selectedModel && `Powered by ${selectedModel.split('-')[0]}.`}
+                  </p>
                 </div>
               </Card>
             </TabsContent>
