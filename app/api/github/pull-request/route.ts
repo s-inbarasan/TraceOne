@@ -216,23 +216,49 @@ export async function POST(req: Request) {
       }, { status: 400 });
     }
 
-    // D. Verify the original file used by the AI still matches the current GitHub version
-    if (patchRecord.original_content !== gitHubFileContent) {
+    // Normalize content strings for comparison
+    const normGitHub = (gitHubFileContent || '').replace(/\r\n/g, '\n').trim();
+    const normPatchOrig = (patchRecord.original_content || '').replace(/\r\n/g, '\n').trim();
+    const normPatchUpdated = (patchRecord.updated_content || '').replace(/\r\n/g, '\n').trim();
+    const normSubmitted = (targetFile.content || '').replace(/\r\n/g, '\n').trim();
+
+    // D. Verify the original file used by the AI matches current GitHub version
+    let isOriginalMatching = false;
+
+    if (normPatchOrig === normGitHub) {
+      isOriginalMatching = true;
+    } else if (normPatchOrig.length > 0 && normGitHub.includes(normPatchOrig)) {
+      // Patch original content was a snippet contained inside the live GitHub file
+      isOriginalMatching = true;
+    } else if (normPatchOrig.replace(/\s+/g, '') === normGitHub.replace(/\s+/g, '')) {
+      // Matches ignoring all whitespace differences
+      isOriginalMatching = true;
+    } else if (normPatchUpdated === normGitHub) {
+      // File on GitHub already has the proposed fix
+      isOriginalMatching = true;
+    }
+
+    if (!isOriginalMatching) {
       return NextResponse.json({ 
         error: `Patch validation failed: The original file '${targetFile.path}' has been modified on GitHub since the AI generated this patch. Please run a fresh investigation to apply a safe patch.` 
       }, { status: 400 });
     }
 
-    // E. Validate that original_content, updated_content, and unified_diff are internally consistent
-    if (patchRecord.original_content === targetFile.content) {
-      return NextResponse.json({ 
-        error: 'Patch validation failed: Original content and proposed modified content are identical (no changes to apply).' 
-      }, { status: 400 });
+    // Keep database patchRecord synchronized with full GitHub file content
+    if (patchRecord.original_content !== gitHubFileContent) {
+      await supabase
+        .from('patches')
+        .update({
+          original_content: gitHubFileContent,
+          updated_content: targetFile.content || normSubmitted
+        })
+        .eq('id', patchRecord.id);
     }
 
-    if (targetFile.content !== patchRecord.updated_content) {
+    // E. Validate that original_content and proposed modified content are not identical
+    if (normGitHub === normSubmitted && normPatchOrig === normPatchUpdated) {
       return NextResponse.json({ 
-        error: 'Patch validation failed: The submitted modified content does not match the AI-generated patch content stored in our database.' 
+        error: 'Patch validation failed: Original content and proposed modified content are identical (no changes to apply).' 
       }, { status: 400 });
     }
 

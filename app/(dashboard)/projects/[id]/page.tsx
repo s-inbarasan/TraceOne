@@ -506,10 +506,20 @@ export default function ProjectWorkspacePage({ params }: { params: Promise<{ id:
       addChatMessage(projectId, "assistant", aiResponse)
 
       if (parsedPatch && parsedPatch.hasFix) {
+        const targetPath = parsedPatch.filePath || selectedFile
+        const fullContent = fileContents[targetPath] || ""
+        let patchOrig = parsedPatch.original || fullContent
+        let patchMod = parsedPatch.modified || fullContent
+
+        if (fullContent && parsedPatch.original && parsedPatch.modified && fullContent.includes(parsedPatch.original)) {
+          patchOrig = fullContent
+          patchMod = fullContent.replace(parsedPatch.original, parsedPatch.modified)
+        }
+
         setDiffState({
-          filePath: parsedPatch.filePath || selectedFile,
-          original: parsedPatch.original,
-          modified: parsedPatch.modified
+          filePath: targetPath,
+          original: patchOrig,
+          modified: patchMod
         })
         
         // Save to patches table
@@ -520,9 +530,9 @@ export default function ProjectWorkspacePage({ params }: { params: Promise<{ id:
             body: JSON.stringify({
               project_id: project?.id || projectId,
               repository_id: project?.repositories?.[0]?.id,
-              file_path: parsedPatch.filePath || selectedFile,
-              original_content: parsedPatch.original,
-              updated_content: parsedPatch.modified,
+              file_path: targetPath,
+              original_content: patchOrig,
+              updated_content: patchMod,
               model: selectedModel,
               root_cause: parsedPatch.rootCause || null,
               confidence_score: parsedPatch.confidenceScore || null,
@@ -598,14 +608,56 @@ export default function ProjectWorkspacePage({ params }: { params: Promise<{ id:
       
       addChatMessage(projectId, "assistant", aiResponse)
 
-      let targetFilePath = selectedFile || "src/controllers/analytics.ts"
-      let targetOriginal = "  // RUNTIME EXCEPTION: rawMetrics is null for new users\n  const formatted = rawMetrics.map((m: any) => formatMetric(m));"
-      let targetModified = "  // SAFE FALLBACK: Protect against null/undefined rawMetrics\n  const formatted = (rawMetrics || []).map((m: any) => formatMetric(m));"
+      let targetFilePath = selectedFile || filePaths[0] || "src/controllers/analytics.ts"
+      
+      // Ensure file content is fetched if missing before patch creation
+      let currentFileContent = fileContents[targetFilePath] || ""
+      if (!currentFileContent && project?.source_type === "github" && project?.id) {
+        try {
+          const fileRes = await fetch(`/api/github/file-content?project_id=${project.id}&path=${encodeURIComponent(targetFilePath)}`)
+          const fileData = await fileRes.json()
+          if (fileData.success && fileData.content) {
+            currentFileContent = fileData.content
+            setFileContents(prev => ({ ...prev, [targetFilePath]: fileData.content }))
+          }
+        } catch (fErr) {
+          console.error("Could not fetch file content before patch generation", fErr)
+        }
+      }
+
+      let targetOriginal = currentFileContent
+      let targetModified = ""
 
       if (parsedPatch && parsedPatch.hasFix) {
-        targetFilePath = parsedPatch.filePath || selectedFile
-        targetOriginal = parsedPatch.original
-        targetModified = parsedPatch.modified
+        if (parsedPatch.filePath) {
+          targetFilePath = parsedPatch.filePath
+        }
+        const fileContentForTarget = fileContents[targetFilePath] || currentFileContent
+        const patchOrig = parsedPatch.original || ""
+        const patchMod = parsedPatch.modified || ""
+
+        if (fileContentForTarget && patchOrig && patchMod && fileContentForTarget.includes(patchOrig)) {
+          targetOriginal = fileContentForTarget
+          targetModified = fileContentForTarget.replace(patchOrig, patchMod)
+        } else if (patchMod) {
+          targetOriginal = fileContentForTarget || patchOrig
+          targetModified = patchMod
+        } else {
+          targetOriginal = fileContentForTarget
+          targetModified = fileContentForTarget
+        }
+      } else {
+        if (currentFileContent) {
+          targetOriginal = currentFileContent
+          if (currentFileContent.includes("rawMetrics.map")) {
+            targetModified = currentFileContent.replace("rawMetrics.map", "(rawMetrics || []).map")
+          } else {
+            targetModified = currentFileContent
+          }
+        } else {
+          targetOriginal = "  // RUNTIME EXCEPTION: rawMetrics is null for new users\n  const formatted = rawMetrics.map((m: any) => formatMetric(m));"
+          targetModified = "  // SAFE FALLBACK: Protect against null/undefined rawMetrics\n  const formatted = (rawMetrics || []).map((m: any) => formatMetric(m));"
+        }
       }
 
       setDiffState({
@@ -810,10 +862,19 @@ export default function ProjectWorkspacePage({ params }: { params: Promise<{ id:
             variant="outline"
             className="gap-1.5 text-xs" 
             onClick={handleRunAutoInvestigation}
-            disabled={isGenerating}
+            disabled={isGenerating || isSubmittingPr}
           >
-            <Sparkles className="size-3.5 text-primary" />
-            Auto-Investigate
+            {isGenerating ? (
+              <>
+                <Loader2 className="size-3.5 animate-spin text-primary" />
+                <span>Investigating...</span>
+              </>
+            ) : (
+              <>
+                <Sparkles className="size-3.5 text-primary" />
+                <span>Auto-Investigate</span>
+              </>
+            )}
           </Button>
 
           {diffState && !prCreated && !isSubmittingPr && (
@@ -1116,10 +1177,10 @@ export default function ProjectWorkspacePage({ params }: { params: Promise<{ id:
                       <GitPullRequest className="size-4 text-success" /> Generated Patch & Code Diff
                     </CardTitle>
                     <CardDescription className="text-[11px]">
-                      {diffState ? `Target File: ${diffState.filePath}` : "No active code patch generated yet."}
+                      {isGenerating ? "Analyzing codebase AST and generating AI patch..." : diffState ? `Target File: ${diffState.filePath}` : "No active code patch generated yet."}
                     </CardDescription>
                   </div>
-                  {diffState && !prCreated && !isSubmittingPr && (
+                  {diffState && !prCreated && !isSubmittingPr && !isGenerating && (
                     <Button size="sm" onClick={handleCreatePullRequest} className="gap-1.5 text-xs">
                       <GitPullRequest className="size-3.5" />
                       Open Pull Request
@@ -1149,7 +1210,12 @@ export default function ProjectWorkspacePage({ params }: { params: Promise<{ id:
                   )}
                 </CardHeader>
                 <CardContent className="p-4 font-mono text-xs">
-                  {diffState ? (
+                  {isGenerating ? (
+                    <div className="py-12 text-center text-muted-foreground space-y-3">
+                      <Loader2 className="size-8 mx-auto animate-spin text-primary" />
+                      <p className="font-sans text-xs">Trace One AI is investigating error stack traces and building patch...</p>
+                    </div>
+                  ) : diffState ? (
                     <div className="space-y-4">
                       <div className="space-y-1">
                         <span className="text-[10px] font-semibold text-destructive uppercase">Original Code</span>
@@ -1167,9 +1233,16 @@ export default function ProjectWorkspacePage({ params }: { params: Promise<{ id:
                   ) : (
                     <div className="py-12 text-center text-muted-foreground space-y-3">
                       <Bot className="size-8 mx-auto text-muted-foreground/60" />
-                      <p>No active patch proposed. Run Auto-Investigate to generate a code fix.</p>
-                      <Button size="sm" variant="outline" onClick={handleRunAutoInvestigation}>
-                        Generate Fix Now
+                      <p className="font-sans text-xs">No active patch proposed. Run Auto-Investigate to generate a code fix.</p>
+                      <Button size="sm" variant="outline" onClick={handleRunAutoInvestigation} disabled={isGenerating}>
+                        {isGenerating ? (
+                          <>
+                            <Loader2 className="size-3.5 animate-spin mr-1.5 text-primary" />
+                            Generating Fix...
+                          </>
+                        ) : (
+                          "Generate Fix Now"
+                        )}
                       </Button>
                     </div>
                   )}
