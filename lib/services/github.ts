@@ -75,6 +75,12 @@ export async function getStoredGitHubToken(userId: string, supabaseClient: any) 
       return connRow.access_token;
     }
 
+    // 3. Environment variable fallback
+    const envToken = process.env.GITHUB_TOKEN || process.env.GITHUB_ACCESS_TOKEN || process.env.GITHUB_PAT;
+    if (envToken) {
+      return envToken;
+    }
+
     return null;
   } catch (err) {
     console.error('Error fetching stored GitHub token:', err);

@@ -21,6 +21,8 @@ export default function SettingsPage() {
 
   const [githubUser, setGithubUser] = useState<any | null>(null)
   const [githubLoading, setGithubLoading] = useState(true)
+  const [patInput, setPatInput] = useState("")
+  const [patSaving, setPatSaving] = useState(false)
 
   useEffect(() => {
     if (profile) {
@@ -120,6 +122,41 @@ export default function SettingsPage() {
     } catch (err: any) {
       console.error("Error connecting GitHub:", err)
       addNotification("Connection Failed", "Unable to establish GitHub link.", "error")
+    }
+  }
+
+  const handleSavePat = async () => {
+    if (!patInput.trim()) return
+    setPatSaving(true)
+    try {
+      const supabase = createClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.access_token) {
+        throw new Error("Unauthorized")
+      }
+
+      const res = await fetch("/api/github/connect", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({ provider_token: patInput.trim() })
+      })
+
+      const data = await res.json()
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to verify GitHub Personal Access Token")
+      }
+
+      setGithubUser(data.user)
+      setPatInput("")
+      addNotification("GitHub Connected", `Successfully linked as @${data.user.login}`, "success")
+    } catch (err: any) {
+      console.error("Error saving PAT:", err)
+      addNotification("Connection Failed", err.message || "Failed to verify GitHub token.", "error")
+    } finally {
+      setPatSaving(false)
     }
   }
 
@@ -274,12 +311,30 @@ export default function SettingsPage() {
             ) : (
               <div className="flex flex-col items-start gap-4">
                 <p className="text-xs text-muted-foreground leading-relaxed max-w-2xl">
-                  By linking your GitHub account, Trace One automatically syncs repository file structures, parses imports, reads build configuration manifests, and submits non-destructive, isolated pull request suggestions.
+                  By linking your GitHub account or providing a Personal Access Token (PAT), Trace One automatically syncs repository file structures, parses imports, reads build configuration manifests, and submits pull requests for AI fixes.
                 </p>
-                <Button onClick={handleGitHubConnect} className="gap-2 h-8.5 text-xs">
-                  <GitBranch className="size-4" />
-                  Connect GitHub Account
-                </Button>
+                <div className="flex flex-wrap items-center gap-3 w-full max-w-xl">
+                  <Button onClick={handleGitHubConnect} className="gap-2 h-8.5 text-xs">
+                    <GitBranch className="size-4" />
+                    Connect via GitHub OAuth
+                  </Button>
+                </div>
+                <div className="w-full max-w-xl pt-2 border-t border-border/40 space-y-2">
+                  <label className="text-xs font-semibold text-muted-foreground">Or connect using a Personal Access Token (PAT):</label>
+                  <div className="flex gap-2">
+                    <Input
+                      type="password"
+                      placeholder="ghp_... or github_pat_..."
+                      value={patInput}
+                      onChange={(e) => setPatInput(e.target.value)}
+                      className="text-xs h-8.5 flex-1"
+                    />
+                    <Button onClick={handleSavePat} disabled={patSaving || !patInput.trim()} size="sm" className="h-8.5 text-xs">
+                      {patSaving ? <Loader2 className="size-3.5 animate-spin mr-1" /> : null}
+                      Save Token
+                    </Button>
+                  </div>
+                </div>
               </div>
             )}
           </CardContent>

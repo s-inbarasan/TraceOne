@@ -207,9 +207,18 @@ export async function POST(req: Request) {
     }
 
     // 6. Verify GitHub connection exists and retrieve the token
-    const token = await getStoredGitHubToken(user.id, supabase);
+    let token = await getStoredGitHubToken(user.id, supabase);
     if (!token) {
-      return NextResponse.json({ error: 'GitHub connection not found' }, { status: 403 });
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.provider_token) {
+        token = session.provider_token;
+      }
+    }
+
+    if (!token) {
+      return NextResponse.json({ 
+        error: 'GitHub connection not found. Please connect your GitHub account or save a Personal Access Token in Settings.' 
+      }, { status: 403 });
     }
 
     // 7. PATCH VALIDATION GATE
