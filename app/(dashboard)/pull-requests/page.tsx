@@ -11,6 +11,7 @@ import {
   Clock,
   AlertCircle,
   Loader2,
+  CheckCircle2,
 } from "lucide-react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
@@ -29,13 +30,35 @@ export default function PullRequestsPage() {
           .order("created_at", { ascending: false });
 
         if (error) throw error;
+        let formatted: any[] = [];
         if (data) {
-          const formatted = data.map(pr => ({
+          formatted = data.map(pr => ({
             ...pr,
             repository: pr.repositories?.full_name || 'Unknown Repository',
-            incident_id: pr.investigations?.incidents?.id || pr.investigation_id
+            incident_id: pr.investigations?.incidents?.id || pr.investigation_id,
+            check_status: 'unknown'
           }));
           setPullRequests(formatted);
+        }
+
+        // Fetch dynamic CI/CD check and deployment status enrichment
+        const checkRes = await fetch('/api/github/pull-request/checks');
+        if (checkRes.ok) {
+          const checkData = await checkRes.json();
+          if (checkData.success && checkData.prs) {
+            const checksMap = new Map(checkData.prs.map((p: any) => [p.id, p]));
+            setPullRequests(prev => prev.map(pr => {
+              const livePR = checksMap.get(pr.id);
+              if (livePR) {
+                return {
+                  ...pr,
+                  status: livePR.status,
+                  check_status: livePR.check_status
+                };
+              }
+              return pr;
+            }));
+          }
         }
       } catch (err) {
         console.error("Error fetching pull requests:", err);
@@ -99,10 +122,32 @@ export default function PullRequestsPage() {
                         {pr.title}
                       </span>
                       <Badge
-                        variant={pr.status === "merged" ? "default" : "outline"}
+                        variant={
+                          pr.status === "merged" 
+                            ? "default" 
+                            : pr.status === "failed" || pr.status === "requires_attention" 
+                              ? "destructive" 
+                              : "outline"
+                        }
                       >
                         {pr.status}
                       </Badge>
+                      
+                      {pr.check_status === "success" && (
+                        <Badge className="gap-1 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 border-emerald-500/20 text-[10px] py-0 h-5">
+                          <CheckCircle2 className="size-3" /> Checks Passed
+                        </Badge>
+                      )}
+                      {pr.check_status === "failed" && (
+                        <Badge variant="destructive" className="gap-1 bg-red-500/10 text-red-500 hover:bg-red-500/20 border-red-500/20 text-[10px] py-0 h-5">
+                          <AlertCircle className="size-3" /> Checks Failed
+                        </Badge>
+                      )}
+                      {pr.check_status === "pending" && (
+                        <Badge className="gap-1 bg-amber-500/10 text-amber-500 hover:bg-amber-500/20 border-amber-500/20 text-[10px] py-0 h-5">
+                          <Loader2 className="size-3 animate-spin" /> Checks Pending
+                        </Badge>
+                      )}
                     </div>
                     <div className="flex items-center gap-3 text-sm text-muted-foreground">
                       <span className="font-mono text-xs">{pr.repository}</span>
