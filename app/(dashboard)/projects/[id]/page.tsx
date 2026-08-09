@@ -1,6 +1,6 @@
 "use client"
 
-import { use, useEffect, useState } from "react"
+import { use, useEffect, useState, useRef } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useWorkspace, Project, Message } from "@/lib/context/WorkspaceContext"
 import { Button } from "@/components/ui/button"
@@ -73,6 +73,15 @@ export default function ProjectWorkspacePage({ params }: { params: Promise<{ id:
     selectedModel,
     setSelectedModel
   } = useWorkspace()
+
+  const messages = chatHistory[projectId] || [
+    {
+      id: "init",
+      role: "assistant",
+      content: "Welcome to Trace One AI Workspace. I've analyzed your repository and runtime exception logs. \n\nI detected a **500 Internal Server Error** in `src/controllers/analytics.ts` caused by `rawMetrics` evaluating to `null` when new users query analytics.\n\nType below or click **Auto-Investigate & Fix** to generate a patch.",
+      timestamp: new Date().toISOString()
+    }
+  ]
 
   const [project, setProject] = useState<Project | null>(null)
   const [activeTab, setActiveTab] = useState<"chat" | "code" | "logs" | "diff">("chat")
@@ -450,15 +459,6 @@ export default function ProjectWorkspacePage({ params }: { params: Promise<{ id:
       setActiveProject(fallback)
     }
   }, [projectId, projects, activeProject, setActiveProject])
-
-  const messages = chatHistory[projectId] || [
-    {
-      id: "init",
-      role: "assistant",
-      content: "Welcome to Trace One AI Workspace. I've analyzed your repository and runtime exception logs. \n\nI detected a **500 Internal Server Error** in `src/controllers/analytics.ts` caused by `rawMetrics` evaluating to `null` when new users query analytics.\n\nType below or click **Auto-Investigate & Fix** to generate a patch.",
-      timestamp: new Date().toISOString()
-    }
-  ]
 
   const buildPromptContext = (userText: string) => {
     let context = `Project: ${project?.name || "Acme Service"}\n`
