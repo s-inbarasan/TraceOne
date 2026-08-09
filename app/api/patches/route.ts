@@ -24,8 +24,25 @@ export async function POST(req: NextRequest) {
       time_estimate_minutes
     } = await req.json();
 
-    if (!project_id || !repository_id) {
-       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+    if (!project_id) {
+       return NextResponse.json({ error: "Missing required project_id field" }, { status: 400 });
+    }
+
+    // Resolve repository_id if not provided
+    let repoId = repository_id;
+    if (!repoId) {
+      const { data: repo } = await supabase
+        .from('repositories')
+        .select('id')
+        .eq('project_id', project_id)
+        .limit(1)
+        .maybeSingle();
+      
+      if (repo) {
+        repoId = repo.id;
+      } else {
+        return NextResponse.json({ error: "Repository not found for this project" }, { status: 400 });
+      }
     }
 
     // 1. Check if there's an incident for this project
@@ -112,7 +129,7 @@ export async function POST(req: NextRequest) {
       .from('patches')
       .insert({
          investigation_id: investigation.id,
-         repository_id,
+         repository_id: repoId,
          file_path,
          original_content,
          updated_content,

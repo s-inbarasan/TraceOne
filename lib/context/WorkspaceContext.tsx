@@ -442,6 +442,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     try {
       // Try to create in Supabase
       let dbProj: any = null
+      let insertedRepo: any = null
       if (user) {
         const { data, error } = await supabase
           .from("projects")
@@ -455,7 +456,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
             const parts = sourceVal.split('/')
             const repoOwner = parts[0] || 'unknown'
             const repoNamePart = parts[1] || sourceVal
-            await supabase.from("repositories").insert({
+            const { data: repoRecord } = await supabase.from("repositories").insert({
               project_id: dbProj.id,
               github_id: Math.floor(Math.random() * 100000000),
               full_name: sourceVal,
@@ -463,7 +464,8 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
               repo_name: repoNamePart,
               default_branch: "main",
               html_url: `https://github.com/${sourceVal}`
-            })
+            }).select().single()
+            insertedRepo = repoRecord
           }
         }
       }
@@ -540,6 +542,7 @@ export async function getAnalytics(req: any, res: any) {
         slug,
         source_type: sourceType,
         repository: sourceType === "github" ? (sourceVal as string) : undefined,
+        repositories: insertedRepo ? [insertedRepo] : [],
         status: "healthy",
         created_at: new Date().toISOString(),
         files: projectFiles,

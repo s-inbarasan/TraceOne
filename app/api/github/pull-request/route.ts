@@ -290,17 +290,21 @@ export async function POST(req: Request) {
     }
 
     try {
+      // Fetch open pull requests in the repository to scan for matching investigation_id in description body
       const { data: openPRs } = await octokit.pulls.list({
         owner,
         repo,
         state: 'open',
-        head: `${owner}:${branch_name}`,
-        base: defaultBranch,
+        per_page: 50,
       });
 
-      if (openPRs && openPRs.length > 0) {
-        const existingGitHubPR = openPRs[0];
-        
+      // Search for any PR with the investigation_id comment or branch name match
+      const matchedPR = openPRs.find(p => 
+        (p.body && p.body.includes(`investigation_id: ${investigation_id}`)) ||
+        (p.head && p.head.ref === branch_name)
+      );
+
+      if (matchedPR) {
         // Ensure metadata in database is in sync
         const { data: dbPR } = await supabase
           .from('pull_requests')
@@ -312,24 +316,24 @@ export async function POST(req: Request) {
           await supabase.from('pull_requests').insert({
             investigation_id: investigation_id,
             repository_id: repoRecord.id, // repositories.id UUID, not github_id
-            github_pr_id: existingGitHubPR.id,
-            github_pr_number: existingGitHubPR.number,
-            title: existingGitHubPR.title,
-            description: existingGitHubPR.body,
-            branch_name: branch_name,
+            github_pr_id: matchedPR.id,
+            github_pr_number: matchedPR.number,
+            title: matchedPR.title,
+            description: matchedPR.body,
+            branch_name: matchedPR.head.ref,
             status: 'open',
-            url: existingGitHubPR.html_url
+            url: matchedPR.html_url
           });
         }
 
         return NextResponse.json({ 
           success: true, 
-          url: existingGitHubPR.html_url, 
-          message: 'An open Pull Request already exists for this branch.' 
+          url: matchedPR.html_url, 
+          message: 'An open Pull Request already exists for this investigation.' 
         });
       }
     } catch (err) {
-      console.warn('Could not list open pull requests on GitHub:', err);
+      console.warn('Could not scan open pull requests for duplicates on GitHub:', err);
     }
 
     // Perform Git operations to create real branch, commit, and PR on GitHub
@@ -473,11 +477,12 @@ export async function POST(req: Request) {
     // Step F: Create the real GitHub Pull Request
     let prData: any;
     try {
+      const prBody = `${description || ''}\n\n<!-- investigation_id: ${investigation_id} -->`;
       const { data } = await octokit.pulls.create({
         owner,
         repo,
         title,
-        body: description || '',
+        body: prBody,
         head: branch_name,
         base: defaultBranch,
       });
