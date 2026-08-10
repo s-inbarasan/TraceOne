@@ -40,8 +40,6 @@ export function Sidebar() {
     setActiveProject, 
     sidebarCollapsed, 
     setSidebarCollapsed,
-    mobileMenuOpen,
-    setMobileMenuOpen,
     addNotification
   } = useWorkspace()
 
@@ -69,113 +67,91 @@ export function Sidebar() {
     { name: "Settings", href: "/settings", icon: Settings },
   ]
 
-  const isCollapsed = sidebarCollapsed;
-
   return (
-    <>
-      <AnimatePresence>
-        {mobileMenuOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => setMobileMenuOpen(false)}
-            className="fixed inset-0 z-40 bg-background/80 backdrop-blur-sm md:hidden"
+    <motion.div 
+      animate={{ width: sidebarCollapsed ? 64 : 260 }}
+      transition={{ duration: 0.25, ease: "easeInOut" }}
+      className="flex h-full flex-col border-r border-border bg-card/95 text-card-foreground select-none relative"
+    >
+      {/* Brand Header */}
+      <div className="flex h-14 items-center justify-between border-b border-border px-4">
+        <Link href="/dashboard" className="flex items-center gap-2.5 overflow-hidden py-1">
+          <img 
+            src="https://od.lk/s/OTNfMzY2MDI0MjZfWVBJV0k/TRACE-ONE-logo.png" 
+            alt="Trace One" 
+            className={cn("h-7 w-auto object-contain bg-transparent transition-all", sidebarCollapsed ? "max-w-[36px]" : "max-w-[36px]")}
           />
-        )}
-      </AnimatePresence>
-      <motion.div 
-        animate={{ width: sidebarCollapsed ? 64 : 260 }}
-        transition={{ duration: 0.25, ease: "easeInOut" }}
-        className={cn(
-          "flex h-full flex-col border-r border-border bg-card/95 text-card-foreground select-none relative",
-          "max-md:fixed max-md:inset-y-0 max-md:left-0 max-md:z-50 max-md:transition-transform max-md:duration-300 max-md:!w-[260px]",
-          mobileMenuOpen ? "max-md:translate-x-0" : "max-md:-translate-x-full"
-        )}
-      >
-        {/* Brand Header */}
-        <div className="flex h-14 items-center justify-between border-b border-border px-4">
-          <Link href="/dashboard" className="flex items-center gap-2.5 overflow-hidden py-1" onClick={() => setMobileMenuOpen(false)}>
-            <img 
-              src="https://od.lk/s/OTNfMzY2MDI0MjZfWVBJV0k/TRACE-ONE-logo.png" 
-              alt="Trace One" 
-              className={cn("h-7 w-auto object-contain bg-transparent transition-all", isCollapsed ? "max-md:max-w-[36px] max-w-[36px]" : "max-w-[36px]")}
-            />
-            {(!isCollapsed || true) && (
-              <span className={cn("text-sm font-black tracking-wider text-foreground whitespace-nowrap", isCollapsed ? "max-md:block md:hidden" : "")}>
-                TRACE <span className="text-primary font-black">ONE</span>
-              </span>
-            )}
-          </Link>
-          
-          {(!isCollapsed || true) && (
-            <button 
-              onClick={() => setSidebarCollapsed(true)}
-              className={cn("flex size-6 items-center justify-center rounded-md border border-border hover:bg-secondary text-muted-foreground transition-colors", isCollapsed ? "max-md:flex md:hidden" : "")}
-            >
-              <ChevronLeft className="size-3.5" />
-            </button>
+          {!sidebarCollapsed && (
+            <span className="text-sm font-black tracking-wider text-foreground whitespace-nowrap">
+              TRACE <span className="text-primary font-black">ONE</span>
+            </span>
           )}
+        </Link>
+        
+        {!sidebarCollapsed && (
+          <button 
+            onClick={() => setSidebarCollapsed(true)}
+            className="flex size-6 items-center justify-center rounded-md border border-border hover:bg-secondary text-muted-foreground transition-colors"
+          >
+            <ChevronLeft className="size-3.5" />
+          </button>
+        )}
+      </div>
+
+      {/* Main Content Area */}
+      <div className="flex-1 overflow-y-auto overflow-x-hidden py-4 space-y-6">
+        
+        {/* New Project Quick Link */}
+        <div className="px-3">
+          <Link 
+            href="/projects?new=true"
+            className={cn(
+              "flex items-center gap-2.5 rounded-lg border border-dashed border-border/60 hover:border-primary/40 hover:bg-secondary/40 text-xs font-medium text-muted-foreground hover:text-foreground transition-all cursor-pointer",
+              sidebarCollapsed ? "justify-center p-2" : "px-3 py-2"
+            )}
+          >
+            <Plus className="size-4 shrink-0 text-primary" />
+            {!sidebarCollapsed && <span>New Project</span>}
+          </Link>
         </div>
 
-        {/* Main Content Area */}
-        <div className="flex-1 overflow-y-auto overflow-x-hidden py-4 space-y-6">
-          
-          {/* New Project Quick Link */}
-          <div className="px-3">
-            <Link 
-              href="/projects?new=true"
-              onClick={() => setMobileMenuOpen(false)}
-              className={cn(
-                "flex items-center gap-2.5 rounded-lg border border-dashed border-border/60 hover:border-primary/40 hover:bg-secondary/40 text-xs font-medium text-muted-foreground hover:text-foreground transition-all cursor-pointer",
-                isCollapsed ? "max-md:justify-start max-md:px-3 max-md:py-2 md:justify-center md:p-2" : "px-3 py-2"
-              )}
-            >
-              <Plus className="size-4 shrink-0 text-primary" />
-              {(!isCollapsed || true) && <span className={cn(isCollapsed ? "max-md:inline md:hidden" : "")}>New Project</span>}
-            </Link>
-          </div>
-
-          {/* Navigation Section */}
-          <div className="px-3 space-y-1">
-            {mainNavigation.map((item) => {
-              const isActive = pathname === item.href
-              return (
-                <Link
-                  key={item.name}
-                  href={item.href}
-                  onClick={() => setMobileMenuOpen(false)}
-                  className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors relative group",
-                    isActive
-                      ? "bg-primary/10 text-primary"
-                      : "text-muted-foreground hover:bg-secondary/60 hover:text-foreground"
-                  )}
-                >
-                  <item.icon className={cn("size-4.5 shrink-0", isActive ? "text-primary" : "")} />
-                  {(!isCollapsed || true) ? (
-                    <span className={cn(isCollapsed ? "max-md:inline md:hidden" : "")}>{item.name}</span>
-                  ) : null}
-                  {isCollapsed && (
-                    <div className="hidden md:block absolute left-16 bg-popover text-popover-foreground text-xs font-semibold rounded px-2 py-1 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap shadow-md pointer-events-none z-50">
-                      {item.name}
-                    </div>
-                  )}
-                </Link>
-              )
-            })}
-          </div>
+        {/* Navigation Section */}
+        <div className="px-3 space-y-1">
+          {mainNavigation.map((item) => {
+            const isActive = pathname === item.href
+            return (
+              <Link
+                key={item.name}
+                href={item.href}
+                className={cn(
+                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors relative group",
+                  isActive
+                    ? "bg-primary/10 text-primary"
+                    : "text-muted-foreground hover:bg-secondary/60 hover:text-foreground"
+                )}
+              >
+                <item.icon className={cn("size-4.5 shrink-0", isActive ? "text-primary" : "")} />
+                {!sidebarCollapsed ? (
+                  <span>{item.name}</span>
+                ) : (
+                  <div className="absolute left-16 bg-popover text-popover-foreground text-xs font-semibold rounded px-2 py-1 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap shadow-md pointer-events-none z-50">
+                    {item.name}
+                  </div>
+                )}
+              </Link>
+            )
+          })}
+        </div>
 
         {/* Projects / Workspaces Section */}
         {projects.length > 0 && (
           <div className="space-y-1">
-            {(!isCollapsed || true) && (
-              <div className={cn("flex items-center justify-between px-6 mb-2", isCollapsed ? "max-md:flex md:hidden" : "")}>
+            {!sidebarCollapsed ? (
+              <div className="flex items-center justify-between px-6 mb-2">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80">Active Projects</span>
               </div>
-            )}
-            {isCollapsed && (
-              <div className="hidden md:block h-px bg-border my-2 mx-3" />
+            ) : (
+              <div className="h-px bg-border my-2 mx-3" />
             )}
             
             <div className="px-3 space-y-1">
@@ -186,7 +162,6 @@ export function Sidebar() {
                     key={proj.id}
                     onClick={() => {
                       setActiveProject(proj)
-                      setMobileMenuOpen(false)
                       router.push(`/projects/${proj.id}`)
                     }}
                     className={cn(
@@ -201,11 +176,10 @@ export function Sidebar() {
                     ) : (
                       <Box className="size-4 shrink-0 text-muted-foreground group-hover:text-foreground" />
                     )}
-                    {(!isCollapsed || true) ? (
-                      <span className={cn("truncate text-xs font-medium", isCollapsed ? "max-md:inline md:hidden" : "")}>{proj.name}</span>
-                    ) : null}
-                    {isCollapsed && (
-                      <div className="hidden md:block absolute left-16 bg-popover text-popover-foreground text-xs font-semibold rounded px-2 py-1 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap shadow-md pointer-events-none z-50">
+                    {!sidebarCollapsed ? (
+                      <span className="truncate text-xs font-medium">{proj.name}</span>
+                    ) : (
+                      <div className="absolute left-16 bg-popover text-popover-foreground text-xs font-semibold rounded px-2 py-1 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap shadow-md pointer-events-none z-50">
                         {proj.name}
                       </div>
                     )}
@@ -218,11 +192,10 @@ export function Sidebar() {
 
         {/* Configuration Section */}
         <div className="space-y-1">
-          {(!isCollapsed || true) && (
-            <div className={cn("px-6 mb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80", isCollapsed ? "max-md:block md:hidden" : "")}>Configuration</div>
-          )}
-          {isCollapsed && (
-            <div className="hidden md:block h-px bg-border my-2 mx-3" />
+          {!sidebarCollapsed ? (
+            <div className="px-6 mb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80">Configuration</div>
+          ) : (
+            <div className="h-px bg-border my-2 mx-3" />
           )}
           <div className="px-3 space-y-1">
             {configNavigation.map((item) => {
@@ -231,7 +204,6 @@ export function Sidebar() {
                 <Link
                   key={item.name}
                   href={item.href}
-                  onClick={() => setMobileMenuOpen(false)}
                   className={cn(
                     "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors relative group",
                     isActive
@@ -240,11 +212,10 @@ export function Sidebar() {
                   )}
                 >
                   <item.icon className={cn("size-4.5 shrink-0", isActive ? "text-primary" : "")} />
-                  {(!isCollapsed || true) ? (
-                    <span className={cn(isCollapsed ? "max-md:inline md:hidden" : "")}>{item.name}</span>
-                  ) : null}
-                  {isCollapsed && (
-                    <div className="hidden md:block absolute left-16 bg-popover text-popover-foreground text-xs font-semibold rounded px-2 py-1 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap shadow-md pointer-events-none z-50">
+                  {!sidebarCollapsed ? (
+                    <span>{item.name}</span>
+                  ) : (
+                    <div className="absolute left-16 bg-popover text-popover-foreground text-xs font-semibold rounded px-2 py-1 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap shadow-md pointer-events-none z-50">
                       {item.name}
                     </div>
                   )}
@@ -257,7 +228,7 @@ export function Sidebar() {
 
       {/* Footer / Profile Card */}
       <div className="mt-auto border-t border-border p-3 space-y-2 bg-secondary/20">
-        <div className={cn("flex items-center gap-3", isCollapsed ? "max-md:justify-start md:justify-center" : "")}>
+        <div className={cn("flex items-center gap-3", sidebarCollapsed ? "justify-center" : "")}>
           {profile?.avatar_url ? (
             <img 
               src={profile.avatar_url} 
@@ -271,27 +242,26 @@ export function Sidebar() {
             </div>
           )}
           
-          {(!isCollapsed || true) && (
-            <div className={cn("flex-1 min-w-0 text-left", isCollapsed ? "max-md:block md:hidden" : "")}>
+          {!sidebarCollapsed && (
+            <div className="flex-1 min-w-0 text-left">
               <p className="text-xs font-semibold text-foreground truncate leading-tight">{profile?.full_name}</p>
               <p className="text-[10px] text-muted-foreground truncate">{profile?.email}</p>
             </div>
           )}
         </div>
 
-        {(!isCollapsed || true) ? (
+        {!sidebarCollapsed ? (
           <button 
             onClick={() => setShowLogoutConfirm(true)}
-            className={cn("flex w-full items-center gap-2 rounded-md hover:bg-destructive/15 text-xs text-muted-foreground hover:text-destructive py-1.5 px-2 transition-colors cursor-pointer", isCollapsed ? "max-md:flex md:hidden" : "")}
+            className="flex w-full items-center gap-2 rounded-md hover:bg-destructive/15 text-xs text-muted-foreground hover:text-destructive py-1.5 px-2 transition-colors cursor-pointer"
           >
             <LogOut className="size-3.5" />
             <span>Sign Out</span>
           </button>
-        ) : null}
-        {isCollapsed && (
+        ) : (
           <button 
             onClick={() => setSidebarCollapsed(false)}
-            className="hidden md:flex w-full justify-center text-muted-foreground hover:text-foreground py-1.5 cursor-pointer"
+            className="flex w-full justify-center text-muted-foreground hover:text-foreground py-1.5 cursor-pointer"
           >
             <ChevronRight className="size-4" />
           </button>
@@ -320,6 +290,5 @@ export function Sidebar() {
         </DialogContent>
       </Dialog>
     </motion.div>
-    </>
   )
 }

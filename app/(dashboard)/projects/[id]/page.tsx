@@ -36,7 +36,7 @@ import {
 import { GithubIcon } from "@/components/ui/icons"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
-import { GeminiLogo, OpenAILogo, AnthropicLogo, NvidiaLogo, GroqLogo, GrokLogo } from "@/components/ui/ai-logos"
+import { GeminiLogo, OpenAILogo, AnthropicLogo, NvidiaLogo, GroqLogo } from "@/components/ui/ai-logos"
 
 function getModelProviderIcon(modelName: string, className = "size-3.5") {
   const model = modelName.toLowerCase();
@@ -54,9 +54,6 @@ function getModelProviderIcon(modelName: string, className = "size-3.5") {
   }
   if (model.includes('groq') || model.includes('70b-versatile')) {
     return <GroqLogo className={className} />
-  }
-  if (model.includes('grok') || model.includes('xai')) {
-    return <GrokLogo className={`${className} rounded-sm object-contain`} />
   }
   return <Bot className={className} />
 }
@@ -915,7 +912,7 @@ export default function ProjectWorkspacePage({ params }: { params: Promise<{ id:
           </div>
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap mt-2 sm:mt-0">
+        <div className="flex items-center gap-2">
           <Button 
             size="sm" 
             variant="outline"
@@ -983,15 +980,15 @@ export default function ProjectWorkspacePage({ params }: { params: Promise<{ id:
       </div>
 
       {activeIncident && (
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 rounded-lg border border-destructive/20 bg-destructive/5 text-destructive gap-2 sm:gap-3 text-xs animate-in slide-in-from-top-4 duration-300">
-          <div className="flex items-start sm:items-center gap-2">
-            <AlertCircle className="size-4 text-destructive shrink-0 mt-0.5 sm:mt-0" />
+        <div className="flex items-center justify-between p-3.5 rounded-lg border border-destructive/20 bg-destructive/5 text-destructive gap-3 text-xs animate-in slide-in-from-top-4 duration-300">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="size-4 text-destructive shrink-0" />
             <div>
               <span className="font-semibold text-foreground">Resolving Incident:</span>{" "}
               <span className="font-mono text-muted-foreground">{activeIncident.title}</span>
             </div>
           </div>
-          <Badge variant="destructive" className="uppercase text-[9px] shrink-0 self-start sm:self-auto ml-6 sm:ml-0">
+          <Badge variant="destructive" className="uppercase text-[9px] shrink-0">
             {activeIncident.severity}
           </Badge>
         </div>
@@ -1116,22 +1113,22 @@ export default function ProjectWorkspacePage({ params }: { params: Promise<{ id:
         </div>
 
         {/* Right Workspace Main Panel */}
-        <div className="lg:col-span-9 flex flex-col space-y-4 min-w-0">
+        <div className="lg:col-span-9 flex flex-col space-y-4">
           
           {/* Workspace Tabs */}
           <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="w-full">
             <div className="flex items-center justify-between border-b border-border pb-2">
-              <TabsList className="bg-secondary/40 p-1 h-auto max-w-full flex-wrap sm:flex-nowrap sm:overflow-x-auto justify-start">
-                <TabsTrigger value="chat" className="text-xs gap-1.5 whitespace-nowrap flex-1 sm:flex-none">
+              <TabsList className="bg-secondary/40 p-1">
+                <TabsTrigger value="chat" className="text-xs gap-1.5">
                   <Bot className="size-3.5" /> AI Copilot
                 </TabsTrigger>
-                <TabsTrigger value="code" className="text-xs gap-1.5 whitespace-nowrap flex-1 sm:flex-none">
+                <TabsTrigger value="code" className="text-xs gap-1.5">
                   <Code2 className="size-3.5" /> Code Inspector
                 </TabsTrigger>
-                <TabsTrigger value="logs" className="text-xs gap-1.5 whitespace-nowrap flex-1 sm:flex-none">
+                <TabsTrigger value="logs" className="text-xs gap-1.5">
                   <Terminal className="size-3.5" /> Exception Logs
                 </TabsTrigger>
-                <TabsTrigger value="diff" className="text-xs gap-1.5 relative whitespace-nowrap flex-1 sm:flex-none">
+                <TabsTrigger value="diff" className="text-xs gap-1.5 relative">
                   <GitPullRequest className="size-3.5" /> Proposed Diff
                   {diffState && <span className="size-2 rounded-full bg-primary animate-pulse ml-1" />}
                 </TabsTrigger>

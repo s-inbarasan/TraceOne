@@ -14,8 +14,8 @@ export async function GET() {
     let { data: providers, error: provErr } = await supabase.from('providers').select('*');
     if (provErr) throw provErr;
 
-    // Self-healing: ensure 'Gemini', 'OpenAI', 'Anthropic', 'NVIDIA', 'Groq', 'xAI' exist in the DB
-    const defaultProviders = ['Gemini', 'OpenAI', 'Anthropic', 'NVIDIA', 'Groq', 'xAI'];
+    // Self-healing: ensure 'Gemini', 'OpenAI', 'Anthropic', 'NVIDIA', 'Groq' exist in the DB
+    const defaultProviders = ['Gemini', 'OpenAI', 'Anthropic', 'NVIDIA', 'Groq'];
     let needsRefetch = false;
     for (const pName of defaultProviders) {
       const exists = providers?.some(p => p.name.toLowerCase() === pName.toLowerCase());

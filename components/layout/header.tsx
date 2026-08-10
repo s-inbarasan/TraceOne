@@ -38,7 +38,7 @@ export function Header() {
 
   return (
     <header className="flex h-14 items-center justify-between border-b border-border bg-background px-4 md:px-6 z-40 relative">
-      <div className="flex flex-1 items-center gap-2 md:gap-4">
+      <div className="flex flex-1 items-center gap-4">
         <Button variant="ghost" size="icon" className="md:hidden shrink-0 -ml-2 text-muted-foreground" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="size-5"><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="18" y2="18"/></svg>
         </Button>
@@ -48,8 +48,8 @@ export function Header() {
             type="text" 
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search... (Press '/')" 
-            className="flex-1 bg-transparent outline-none placeholder:text-muted-foreground text-xs min-w-0"
+            placeholder="Search projects, incidents, or pull requests... (Press '/')" 
+            className="flex-1 bg-transparent outline-none placeholder:text-muted-foreground text-xs"
           />
           {searchQuery && (
             <button onClick={() => setSearchQuery("")} className="hover:text-foreground">
@@ -59,7 +59,7 @@ export function Header() {
         </div>
       </div>
 
-      <div className="flex items-center gap-2 md:gap-4 pl-2">
+      <div className="flex items-center gap-4">
         {/* Notifications Tray Container */}
         <div className="relative" ref={trayRef}>
           <Button 

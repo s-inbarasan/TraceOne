@@ -316,7 +316,7 @@ function ProjectsContent() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">
             Projects
@@ -325,7 +325,7 @@ function ProjectsContent() {
             Manage your monitored applications and connected GitHub repositories.
           </p>
         </div>
-        <Button className="gap-2 self-start sm:self-auto shrink-0" onClick={() => setIsDialogOpen(true)}>
+        <Button className="gap-2" onClick={() => setIsDialogOpen(true)}>
           <Plus className="size-4" />
           Add Project
         </Button>

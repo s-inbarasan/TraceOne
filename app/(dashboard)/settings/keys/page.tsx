@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input"
 import { Key, Eye, EyeOff, Plus, Trash2, CheckCircle2, AlertCircle, RefreshCw, Loader2, Bot, Sparkles, Brain, Cpu, Zap } from "lucide-react"
 import { useState, useEffect } from "react"
 import { Badge } from "@/components/ui/badge"
-import { GeminiLogo, OpenAILogo, AnthropicLogo, NvidiaLogo, GroqLogo, GrokLogo } from "@/components/ui/ai-logos"
+import { GeminiLogo, OpenAILogo, AnthropicLogo, NvidiaLogo, GroqLogo } from "@/components/ui/ai-logos"
 
 export default function ApiKeysPage() {
   const [showKey, setShowKey] = useState<Record<string, boolean>>({})
@@ -116,22 +116,21 @@ export default function ApiKeysPage() {
 
           return (
             <Card key={provider.id}>
-              <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 gap-4">
+              <CardHeader className="flex flex-row items-center justify-between pb-4">
                 <div className="space-y-1">
-                  <CardTitle className="text-base flex flex-wrap items-center gap-2">
+                  <CardTitle className="text-base flex items-center gap-2">
                     {provider.name.toLowerCase().includes('gemini') && <GeminiLogo className="size-6 flex-shrink-0" />}
                     {provider.name.toLowerCase().includes('openai') && <OpenAILogo className="size-6 flex-shrink-0" />}
                     {provider.name.toLowerCase().includes('anthropic') && <AnthropicLogo className="size-6 flex-shrink-0" />}
                     {provider.name.toLowerCase().includes('nvidia') && <NvidiaLogo className="size-6 flex-shrink-0" />}
                     {provider.name.toLowerCase().includes('groq') && <GroqLogo className="size-6 flex-shrink-0" />}
-                    {(provider.name.toLowerCase().includes('grok') || provider.name.toLowerCase().includes('xai')) && <GrokLogo className="size-6 flex-shrink-0 rounded-md object-contain" />}
                     <span>{provider.name}</span>
                     {isConfigured ? (
-                      <Badge variant="default" className="text-[10px] h-5 px-1.5 flex items-center gap-1 bg-green-500/10 text-green-500 hover:bg-green-500/20 border-green-500/20 shrink-0">
+                      <Badge variant="default" className="text-[10px] h-5 px-1.5 flex items-center gap-1 bg-green-500/10 text-green-500 hover:bg-green-500/20 border-green-500/20">
                         <CheckCircle2 className="size-3" /> Connected
                       </Badge>
                     ) : (
-                      <Badge variant="outline" className="text-[10px] h-5 px-1.5 text-muted-foreground shrink-0">Not Configured</Badge>
+                      <Badge variant="outline" className="text-[10px] h-5 px-1.5 text-muted-foreground">Not Configured</Badge>
                     )}
                   </CardTitle>
                   <CardDescription>
@@ -140,7 +139,7 @@ export default function ApiKeysPage() {
                       'Used for root cause analysis and patch generation.'}
                   </CardDescription>
                 </div>
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="flex items-center gap-2">
                   {isConfigured && !isEditing ? (
                     <>
                       <Button variant="outline" size="sm" onClick={() => { setEditing(prev => ({ ...prev, [provider.id]: true })); setNewKeyValues(prev => ({ ...prev, [provider.id]: keyData?.encrypted_key || '' })); }}>
