@@ -102,7 +102,16 @@ export function Header() {
                         variant="ghost" 
                         size="sm" 
                         className="h-7 px-2 text-[10px] gap-1 hover:bg-secondary text-primary"
-                        onClick={markAllRead}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          if (typeof markAllRead === "function") {
+                            try {
+                              markAllRead()
+                            } catch (err) {
+                              console.error("Error marking all read:", err)
+                            }
+                          }
+                        }}
                       >
                         <Check className="size-3" /> Mark all read
                       </Button>
@@ -111,7 +120,16 @@ export function Header() {
                       variant="ghost" 
                       size="sm" 
                       className="h-7 px-2 text-[10px] text-muted-foreground hover:text-destructive hover:bg-destructive/10 gap-1"
-                      onClick={clearAllNotifications}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        if (typeof clearAllNotifications === "function") {
+                          try {
+                            clearAllNotifications()
+                          } catch (err) {
+                            console.error("Error clearing notifications:", err)
+                          }
+                        }
+                      }}
                     >
                       <Trash2 className="size-3" /> Clear all
                     </Button>
@@ -136,7 +154,16 @@ export function Header() {
                           "p-4 hover:bg-secondary/30 transition-colors relative cursor-pointer flex gap-3",
                           !notif.read ? "bg-primary/5 border-l-2 border-primary" : ""
                         )}
-                        onClick={() => markAsRead(notif.id)}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          if (typeof markAsRead === "function") {
+                            try {
+                              markAsRead(notif.id)
+                            } catch (err) {
+                              console.error("Error marking notification as read:", err)
+                            }
+                          }
+                        }}
                       >
                         <div className="shrink-0 mt-0.5">
                           {notif.type === "success" && (
@@ -166,7 +193,16 @@ export function Header() {
                               {notif.title}
                             </p>
                             <span className="text-[9px] text-muted-foreground shrink-0 mt-0.5">
-                              {new Date(notif.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              {(() => {
+                                try {
+                                  if (!notif.created_at) return ""
+                                  const date = new Date(notif.created_at)
+                                  if (isNaN(date.getTime())) return ""
+                                  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                                } catch (e) {
+                                  return ""
+                                }
+                              })()}
                             </span>
                           </div>
                           <p className="text-[10px] text-muted-foreground mt-1 leading-relaxed">
