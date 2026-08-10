@@ -4,14 +4,13 @@ import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Bell, Search, Check, Trash2, Shield, Info, AlertTriangle, X } from "lucide-react"
 import { useWorkspace } from "@/lib/context/WorkspaceContext"
-import { motion, AnimatePresence } from "motion/react"
 import { cn } from "@/lib/utils"
 
 export function Header() {
   const { 
     profile, 
-    notifications, 
-    unreadCount, 
+    notifications = [], 
+    unreadCount = 0, 
     markAllRead, 
     clearAllNotifications, 
     markAsRead,
@@ -71,151 +70,145 @@ export function Header() {
             )}
             onClick={() => setIsOpen(!isOpen)}
           >
-            <Bell className="size-4.5" />
+            <Bell className="size-5" />
             {unreadCount > 0 && (
-              <span className="absolute -top-0.5 -right-0.5 flex size-4.5 items-center justify-center rounded-full bg-primary text-[9px] font-bold text-primary-foreground animate-pulse">
+              <span className="absolute -top-0.5 -right-0.5 flex size-4 items-center justify-center rounded-full bg-primary text-[9px] font-bold text-primary-foreground animate-pulse">
                 {unreadCount}
               </span>
             )}
             <span className="sr-only">Notifications</span>
           </Button>
 
-          {/* Animated Notification Center Tray */}
-          <AnimatePresence>
-            {isOpen && (
-              <motion.div 
-                initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                transition={{ duration: 0.15 }}
-                className="absolute right-0 mt-2.5 w-80 sm:w-96 rounded-xl border border-border bg-popover shadow-xl overflow-hidden z-50 text-left"
-              >
-                {/* Header */}
-                <div className="flex items-center justify-between border-b border-border bg-secondary/10 px-4 py-3">
-                  <div>
-                    <h3 className="text-sm font-semibold text-foreground">Notifications</h3>
-                    <p className="text-[10px] text-muted-foreground mt-0.5">{unreadCount} unread messages</p>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    {unreadCount > 0 && (
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="h-7 px-2 text-[10px] gap-1 hover:bg-secondary text-primary"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          if (typeof markAllRead === "function") {
-                            try {
-                              markAllRead()
-                            } catch (err) {
-                              console.error("Error marking all read:", err)
-                            }
-                          }
-                        }}
-                      >
-                        <Check className="size-3" /> Mark all read
-                      </Button>
-                    )}
+          {/* Safe & Robust Notification Center Tray */}
+          {isOpen && (
+            <div 
+              className="absolute right-0 mt-2.5 w-80 sm:w-96 rounded-xl border border-border bg-popover shadow-xl overflow-hidden z-50 text-left transition-all duration-150 ease-out animate-in fade-in slide-in-from-top-1"
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between border-b border-border bg-secondary/10 px-4 py-3">
+                <div>
+                  <h3 className="text-sm font-semibold text-foreground">Notifications</h3>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">{unreadCount} unread messages</p>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  {unreadCount > 0 && (
                     <Button 
                       variant="ghost" 
                       size="sm" 
-                      className="h-7 px-2 text-[10px] text-muted-foreground hover:text-destructive hover:bg-destructive/10 gap-1"
+                      className="h-7 px-2 text-[10px] gap-1 hover:bg-secondary text-primary"
                       onClick={(e) => {
                         e.stopPropagation()
-                        if (typeof clearAllNotifications === "function") {
+                        if (typeof markAllRead === "function") {
                           try {
-                            clearAllNotifications()
+                            markAllRead()
                           } catch (err) {
-                            console.error("Error clearing notifications:", err)
+                            console.error("Error marking all read:", err)
                           }
                         }
                       }}
                     >
-                      <Trash2 className="size-3" /> Clear all
+                      <Check className="size-3" /> Mark all read
                     </Button>
-                  </div>
-                </div>
-
-                {/* List */}
-                <div className="max-h-[350px] overflow-y-auto divide-y divide-border/60">
-                  {notifications.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-10 px-4 text-center">
-                      <div className="flex size-10 items-center justify-center rounded-full bg-secondary/40 text-muted-foreground mb-3">
-                        <Bell className="size-5" />
-                      </div>
-                      <p className="text-xs font-medium text-foreground">No notifications</p>
-                      <p className="text-[10px] text-muted-foreground mt-1">You will receive updates here when AI operations complete.</p>
-                    </div>
-                  ) : (
-                    notifications.map((notif) => (
-                      <div 
-                        key={notif.id} 
-                        className={cn(
-                          "p-4 hover:bg-secondary/30 transition-colors relative cursor-pointer flex gap-3",
-                          !notif.read ? "bg-primary/5 border-l-2 border-primary" : ""
-                        )}
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          if (typeof markAsRead === "function") {
-                            try {
-                              markAsRead(notif.id)
-                            } catch (err) {
-                              console.error("Error marking notification as read:", err)
-                            }
-                          }
-                        }}
-                      >
-                        <div className="shrink-0 mt-0.5">
-                          {notif.type === "success" && (
-                            <div className="flex size-6 items-center justify-center rounded-full bg-success/15 text-success">
-                              <Check className="size-3.5" />
-                            </div>
-                          )}
-                          {notif.type === "info" && (
-                            <div className="flex size-6 items-center justify-center rounded-full bg-info/15 text-info">
-                              <Info className="size-3.5" />
-                            </div>
-                          )}
-                          {notif.type === "warning" && (
-                            <div className="flex size-6 items-center justify-center rounded-full bg-warning/15 text-warning">
-                              <AlertTriangle className="size-3.5" />
-                            </div>
-                          )}
-                          {notif.type === "error" && (
-                            <div className="flex size-6 items-center justify-center rounded-full bg-destructive/15 text-destructive">
-                              <X className="size-3.5" />
-                            </div>
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-start justify-between gap-2">
-                            <p className={cn("text-xs font-semibold leading-tight text-foreground truncate", !notif.read ? "font-bold" : "")}>
-                              {notif.title}
-                            </p>
-                            <span className="text-[9px] text-muted-foreground shrink-0 mt-0.5">
-                              {(() => {
-                                try {
-                                  if (!notif.created_at) return ""
-                                  const date = new Date(notif.created_at)
-                                  if (isNaN(date.getTime())) return ""
-                                  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                                } catch (e) {
-                                  return ""
-                                }
-                              })()}
-                            </span>
-                          </div>
-                          <p className="text-[10px] text-muted-foreground mt-1 leading-relaxed">
-                            {notif.message}
-                          </p>
-                        </div>
-                      </div>
-                    ))
                   )}
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="h-7 px-2 text-[10px] text-muted-foreground hover:text-destructive hover:bg-destructive/10 gap-1"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      if (typeof clearAllNotifications === "function") {
+                        try {
+                          clearAllNotifications()
+                        } catch (err) {
+                          console.error("Error clearing notifications:", err)
+                        }
+                      }
+                    }}
+                  >
+                    <Trash2 className="size-3" /> Clear all
+                  </Button>
                 </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+              </div>
+
+              {/* List */}
+              <div className="max-h-[350px] overflow-y-auto divide-y divide-border/60">
+                {(!notifications || notifications.length === 0) ? (
+                  <div className="flex flex-col items-center justify-center py-10 px-4 text-center">
+                    <div className="flex size-10 items-center justify-center rounded-full bg-secondary/40 text-muted-foreground mb-3">
+                      <Bell className="size-5" />
+                    </div>
+                    <p className="text-xs font-medium text-foreground">No notifications</p>
+                    <p className="text-[10px] text-muted-foreground mt-1">You will receive updates here when AI operations complete.</p>
+                  </div>
+                ) : (
+                  (notifications || []).filter(n => n && n.id).map((notif) => (
+                    <div 
+                      key={notif.id} 
+                      className={cn(
+                        "p-4 hover:bg-secondary/30 transition-colors relative cursor-pointer flex gap-3",
+                        !notif.read ? "bg-primary/5 border-l-2 border-primary" : ""
+                      )}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        if (typeof markAsRead === "function") {
+                          try {
+                            markAsRead(notif.id)
+                          } catch (err) {
+                            console.error("Error marking notification as read:", err)
+                          }
+                        }
+                      }}
+                    >
+                      <div className="shrink-0 mt-0.5">
+                        {notif.type === "success" && (
+                          <div className="flex size-6 items-center justify-center rounded-full bg-success/15 text-success">
+                            <Check className="size-3.5" />
+                          </div>
+                        )}
+                        {(notif.type === "info" || !notif.type) && (
+                          <div className="flex size-6 items-center justify-center rounded-full bg-info/15 text-info">
+                            <Info className="size-3.5" />
+                          </div>
+                        )}
+                        {notif.type === "warning" && (
+                          <div className="flex size-6 items-center justify-center rounded-full bg-warning/15 text-warning">
+                            <AlertTriangle className="size-3.5" />
+                          </div>
+                        )}
+                        {notif.type === "error" && (
+                          <div className="flex size-6 items-center justify-center rounded-full bg-destructive/15 text-destructive">
+                            <X className="size-3.5" />
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-2">
+                          <p className={cn("text-xs font-semibold leading-tight text-foreground truncate", !notif.read ? "font-bold" : "")}>
+                            {notif.title || "Notification"}
+                          </p>
+                          <span className="text-[9px] text-muted-foreground shrink-0 mt-0.5">
+                            {(() => {
+                              try {
+                                if (!notif.created_at) return ""
+                                const date = new Date(notif.created_at)
+                                if (isNaN(date.getTime())) return ""
+                                return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                              } catch (e) {
+                                return ""
+                              }
+                            })()}
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-muted-foreground mt-1 leading-relaxed">
+                          {notif.message || ""}
+                        </p>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* User Badge display */}

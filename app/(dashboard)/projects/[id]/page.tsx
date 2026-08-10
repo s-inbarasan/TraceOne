@@ -399,7 +399,10 @@ export default function ProjectWorkspacePage({ params }: { params: Promise<{ id:
       
       // Auto-scroll if: we're already near bottom, or it's forced (initial load/tab switch), or a new user message just sent
       if (isAtBottom || force) {
-        chatScrollRef.current.scrollIntoView({ behavior: force ? "instant" : "smooth" });
+        container.scrollTo({
+          top: container.scrollHeight,
+          behavior: force ? "instant" : "smooth"
+        });
       }
     };
 
