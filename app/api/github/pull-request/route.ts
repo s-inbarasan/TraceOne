@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient as createServerSupabase } from '@/lib/supabase/server';
-import { getStoredGitHubToken } from '@/lib/services/github';
+import { getStoredGitHubToken, getSupabaseClient } from '@/lib/services/github';
 import { Octokit } from '@octokit/rest';
 
 function parseDiffMetrics(diffText: string) {
@@ -27,10 +27,22 @@ function isValidUUID(str?: string): boolean {
 
 export async function POST(req: Request) {
   try {
-    const supabase = await createServerSupabase();
-    const { data: { user } } = await supabase.auth.getUser();
+    const authHeader = req.headers.get("authorization");
+    let supabase: any;
+    let userResponse;
+
+    if (authHeader) {
+      supabase = getSupabaseClient(authHeader);
+      const token = authHeader.replace("Bearer ", "");
+      userResponse = await supabase.auth.getUser(token);
+    } else {
+      supabase = await createServerSupabase();
+      userResponse = await supabase.auth.getUser();
+    }
+
+    const { data: { user }, error: userError } = userResponse;
     
-    if (!user) {
+    if (userError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -331,7 +343,7 @@ export async function POST(req: Request) {
     const { data: existingPR, error: existingPRError } = await supabase
       .from('pull_requests')
       .select('id, url, status')
-      .eq('investigation_id', investigation_id)
+      .eq('investigation_id', targetInvestigationId)
       .eq('status', 'open')
       .maybeSingle();
 
@@ -350,7 +362,7 @@ export async function POST(req: Request) {
 
       // Search for any PR with the investigation_id comment or branch name match
       const matchedPR = openPRs.find(p => 
-        (p.body && p.body.includes(`investigation_id: ${investigation_id}`)) ||
+        (p.body && p.body.includes(`investigation_id: ${targetInvestigationId}`)) ||
         (p.head && p.head.ref === branch_name)
       );
 
@@ -359,7 +371,7 @@ export async function POST(req: Request) {
         const { data: dbPR } = await supabase
           .from('pull_requests')
           .select('id, url')
-          .eq('investigation_id', investigation_id)
+          .eq('investigation_id', targetInvestigationId)
           .maybeSingle();
 
         if (!dbPR) {
@@ -495,7 +507,7 @@ export async function POST(req: Request) {
             const { data: dbPR } = await supabase
               .from('pull_requests')
               .select('id, url')
-              .eq('investigation_id', investigation_id)
+              .eq('investigation_id', targetInvestigationId)
               .maybeSingle();
 
             if (!dbPR) {
@@ -529,7 +541,7 @@ export async function POST(req: Request) {
     // Step F: Create the real GitHub Pull Request
     let prData: any;
     try {
-      const prBody = `${description || ''}\n\n<!-- investigation_id: ${investigation_id} -->`;
+      const prBody = `${description || ''}\n\n<!-- investigation_id: ${targetInvestigationId} -->`;
       const { data } = await octokit.pulls.create({
         owner,
         repo,

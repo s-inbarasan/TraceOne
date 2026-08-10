@@ -768,11 +768,20 @@ export default function ProjectWorkspacePage({ params }: { params: Promise<{ id:
       let targetInvestigationId = diffState?.investigationId || diffState?.investigation_id;
       let targetRepositoryId = diffState?.repositoryId || diffState?.repository_id || project?.repositories?.[0]?.id;
 
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      
+      const authHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) {
+        authHeaders['Authorization'] = `Bearer ${token}`;
+      }
+
       if (!targetPatchId && (project?.id || projectId)) {
         try {
           const patchRes = await fetch('/api/patches', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: authHeaders,
             body: JSON.stringify({
               project_id: project?.id || projectId,
               repository_id: targetRepositoryId,
@@ -813,7 +822,7 @@ export default function ProjectWorkspacePage({ params }: { params: Promise<{ id:
 
       const res = await fetch('/api/github/pull-request', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders,
         body: JSON.stringify({
           project_id: project?.id || projectId,
           branch_name: `trace-one/fix-${Date.now()}`,
