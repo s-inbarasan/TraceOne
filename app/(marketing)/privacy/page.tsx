@@ -71,7 +71,7 @@ export default function PrivacyPolicyPage() {
 
           <h2 className="text-xl font-semibold text-foreground mt-8">9. Contact Information</h2>
           <p>
-            If you have any questions about this Privacy Policy, please contact us at privacy@traceone.example.com.
+            If you have any questions about this Privacy Policy, please contact us at s.inbarasan.zv@gmail.com.
           </p>
         </div>
       </div>

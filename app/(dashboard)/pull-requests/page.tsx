@@ -109,49 +109,50 @@ export default function PullRequestsPage() {
               {pullRequests.map((pr) => (
                 <div
                   key={pr.id}
-                  className="flex items-center justify-between p-4 hover:bg-secondary/20 transition-colors"
+                  className="flex flex-col sm:flex-row sm:items-center justify-between p-4 gap-4 sm:gap-2 hover:bg-secondary/20 transition-colors"
                 >
-                  <div className="flex flex-col gap-1.5">
-                    <div className="flex items-center gap-2">
+                  <div className="flex flex-col gap-1.5 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
                       {pr.status === "open" ? (
-                        <GitPullRequest className="size-4 text-success" />
+                        <GitPullRequest className="size-4 text-success shrink-0" />
                       ) : (
-                        <GitMerge className="size-4 text-primary" />
+                        <GitMerge className="size-4 text-primary shrink-0" />
                       )}
-                      <span className="font-semibold text-foreground">
+                      <span className="font-semibold text-foreground truncate">
                         {pr.title}
                       </span>
                       <Badge
                         variant={
                           pr.status === "merged" 
                             ? "default" 
-                            : pr.status === "failed" || pr.status === "requires_attention" 
-                              ? "destructive" 
+                            : pr.status === "failed" || pr.status === "requires_attention"
+                              ? "destructive"
                               : "outline"
                         }
+                        className="shrink-0"
                       >
                         {pr.status}
                       </Badge>
                       
                       {pr.check_status === "success" && (
-                        <Badge className="gap-1 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 border-emerald-500/20 text-[10px] py-0 h-5">
+                        <Badge className="gap-1 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 border-emerald-500/20 text-[10px] py-0 h-5 shrink-0">
                           <CheckCircle2 className="size-3" /> Checks Passed
                         </Badge>
                       )}
                       {pr.check_status === "failed" && (
-                        <Badge variant="destructive" className="gap-1 bg-red-500/10 text-red-500 hover:bg-red-500/20 border-red-500/20 text-[10px] py-0 h-5">
+                        <Badge variant="destructive" className="gap-1 bg-red-500/10 text-red-500 hover:bg-red-500/20 border-red-500/20 text-[10px] py-0 h-5 shrink-0">
                           <AlertCircle className="size-3" /> Checks Failed
                         </Badge>
                       )}
                       {pr.check_status === "pending" && (
-                        <Badge className="gap-1 bg-amber-500/10 text-amber-500 hover:bg-amber-500/20 border-amber-500/20 text-[10px] py-0 h-5">
+                        <Badge className="gap-1 bg-amber-500/10 text-amber-500 hover:bg-amber-500/20 border-amber-500/20 text-[10px] py-0 h-5 shrink-0">
                           <Loader2 className="size-3 animate-spin" /> Checks Pending
                         </Badge>
                       )}
                     </div>
-                    <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                    <div className="flex items-center gap-3 text-sm text-muted-foreground flex-wrap">
                       <span className="font-mono text-xs">{pr.repository}</span>
-                      <span>•</span>
+                      <span className="hidden sm:inline">•</span>
                       <Link
                         href={`/incidents/${pr.incident_id}`}
                         className="text-primary hover:underline"
@@ -162,21 +163,21 @@ export default function PullRequestsPage() {
                       </Link>
                     </div>
                   </div>
-                  <div className="flex items-center gap-6 text-sm">
+                  <div className="flex items-center gap-6 text-sm shrink-0 self-start sm:self-auto">
                     <div className="hidden md:flex flex-col gap-1 text-muted-foreground text-xs">
                       <span className="flex items-center gap-1">
-                        <AlertCircle className="size-3" /> Risk:{" "}
+                        <AlertCircle className="size-3 shrink-0" /> Risk:{" "}
                         {pr.risk_level || "Unknown"}
                       </span>
                       <span className="flex items-center gap-1">
-                        <Clock className="size-3" />{" "}
+                        <Clock className="size-3 shrink-0" />{" "}
                         {new Date(pr.created_at).toLocaleString()}
                       </span>
                     </div>
                     <Button
                       variant="outline"
                       size="sm"
-                      className="gap-2"
+                      className="gap-2 w-full sm:w-auto"
                       asChild
                     >
                       <a
@@ -184,7 +185,7 @@ export default function PullRequestsPage() {
                         target="_blank"
                         rel="noopener noreferrer"
                       >
-                        View on GitHub <ExternalLink className="size-3" />
+                        View on GitHub <ExternalLink className="size-3 shrink-0" />
                       </a>
                     </Button>
                   </div>

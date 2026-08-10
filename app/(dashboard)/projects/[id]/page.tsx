@@ -31,8 +31,17 @@ import {
   Brain,
   Cpu,
   Zap,
-  ExternalLink
+  ExternalLink,
+  Trash2
 } from "lucide-react"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { GithubIcon } from "@/components/ui/icons"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
@@ -114,6 +123,10 @@ export default function ProjectWorkspacePage({ params }: { params: Promise<{ id:
   const [configuredProviders, setConfiguredProviders] = useState<any[]>([])
   const [keysLoaded, setKeysLoaded] = useState(false)
   const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false)
+
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+  const [deleteConfirmation, setDeleteConfirmation] = useState("")
+  const [isDeleting, setIsDeleting] = useState(false)
 
   const [filePaths, setFilePaths] = useState<string[]>([])
   const [fileContents, setFileContents] = useState<Record<string, string>>({})
@@ -388,6 +401,34 @@ export default function ProjectWorkspacePage({ params }: { params: Promise<{ id:
     fetchKeys()
   }, [])
 
+
+  const handleDeleteProject = async () => {
+    if (!project || deleteConfirmation !== project.name) return;
+    try {
+      setIsDeleting(true);
+      const res = await fetch(`/api/projects?id=${project.id}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Failed to delete project");
+      }
+      addNotification({
+        title: "Project Deleted",
+        message: "The project has been permanently removed.",
+        type: "success",
+      });
+      router.push("/projects");
+    } catch (err: any) {
+      console.error(err);
+      addNotification({
+        title: "Deletion Failed",
+        message: err.message,
+        type: "error",
+      });
+      setIsDeleting(false);
+    }
+  };
 
   // Add effect to scroll to bottom on new messages or initial load
   useEffect(() => {
@@ -912,7 +953,16 @@ export default function ProjectWorkspacePage({ params }: { params: Promise<{ id:
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap mt-2 sm:mt-0">
+          <Button 
+            size="sm" 
+            variant="ghost"
+            className="gap-1.5 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
+            onClick={() => setIsDeleteDialogOpen(true)}
+          >
+            <Trash2 className="size-3.5" />
+            Delete Project
+          </Button>
           <Button 
             size="sm" 
             variant="outline"
@@ -980,15 +1030,15 @@ export default function ProjectWorkspacePage({ params }: { params: Promise<{ id:
       </div>
 
       {activeIncident && (
-        <div className="flex items-center justify-between p-3.5 rounded-lg border border-destructive/20 bg-destructive/5 text-destructive gap-3 text-xs animate-in slide-in-from-top-4 duration-300">
-          <div className="flex items-center gap-2">
-            <AlertCircle className="size-4 text-destructive shrink-0" />
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 rounded-lg border border-destructive/20 bg-destructive/5 text-destructive gap-2 sm:gap-3 text-xs animate-in slide-in-from-top-4 duration-300">
+          <div className="flex items-start sm:items-center gap-2">
+            <AlertCircle className="size-4 text-destructive shrink-0 mt-0.5 sm:mt-0" />
             <div>
               <span className="font-semibold text-foreground">Resolving Incident:</span>{" "}
               <span className="font-mono text-muted-foreground">{activeIncident.title}</span>
             </div>
           </div>
-          <Badge variant="destructive" className="uppercase text-[9px] shrink-0">
+          <Badge variant="destructive" className="uppercase text-[9px] shrink-0 self-start sm:self-auto ml-6 sm:ml-0">
             {activeIncident.severity}
           </Badge>
         </div>
@@ -1113,22 +1163,22 @@ export default function ProjectWorkspacePage({ params }: { params: Promise<{ id:
         </div>
 
         {/* Right Workspace Main Panel */}
-        <div className="lg:col-span-9 flex flex-col space-y-4">
+        <div className="lg:col-span-9 flex flex-col space-y-4 min-w-0">
           
           {/* Workspace Tabs */}
           <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="w-full">
             <div className="flex items-center justify-between border-b border-border pb-2">
-              <TabsList className="bg-secondary/40 p-1">
-                <TabsTrigger value="chat" className="text-xs gap-1.5">
+              <TabsList className="bg-secondary/40 p-1 h-auto max-w-full flex-wrap sm:flex-nowrap sm:overflow-x-auto justify-start">
+                <TabsTrigger value="chat" className="text-xs gap-1.5 whitespace-nowrap flex-1 sm:flex-none">
                   <Bot className="size-3.5" /> AI Copilot
                 </TabsTrigger>
-                <TabsTrigger value="code" className="text-xs gap-1.5">
+                <TabsTrigger value="code" className="text-xs gap-1.5 whitespace-nowrap flex-1 sm:flex-none">
                   <Code2 className="size-3.5" /> Code Inspector
                 </TabsTrigger>
-                <TabsTrigger value="logs" className="text-xs gap-1.5">
+                <TabsTrigger value="logs" className="text-xs gap-1.5 whitespace-nowrap flex-1 sm:flex-none">
                   <Terminal className="size-3.5" /> Exception Logs
                 </TabsTrigger>
-                <TabsTrigger value="diff" className="text-xs gap-1.5 relative">
+                <TabsTrigger value="diff" className="text-xs gap-1.5 relative whitespace-nowrap flex-1 sm:flex-none">
                   <GitPullRequest className="size-3.5" /> Proposed Diff
                   {diffState && <span className="size-2 rounded-full bg-primary animate-pulse ml-1" />}
                 </TabsTrigger>
@@ -1342,6 +1392,60 @@ export default function ProjectWorkspacePage({ params }: { params: Promise<{ id:
 
         </div>
       </div>
+
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertCircle className="size-5" />
+              Delete Project
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              This action cannot be undone. This will permanently delete the project
+              <strong className="text-foreground mx-1">{project.name}</strong>
+              and remove all associated data including connected repositories, incidents, investigations, patches, analysis runs, and pull-request records.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-xs text-muted-foreground mb-2">
+              Please type <strong className="text-foreground">{project.name}</strong> to confirm.
+            </p>
+            <Input
+              value={deleteConfirmation}
+              onChange={(e) => setDeleteConfirmation(e.target.value)}
+              placeholder={project.name}
+              className="font-mono text-sm"
+              disabled={isDeleting}
+            />
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsDeleteDialogOpen(false);
+                setDeleteConfirmation("");
+              }}
+              disabled={isDeleting}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteProject}
+              disabled={deleteConfirmation !== project.name || isDeleting}
+            >
+              {isDeleting ? (
+                <>
+                  <Loader2 className="size-4 animate-spin mr-2" />
+                  Deleting...
+                </>
+              ) : (
+                "Delete Project"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

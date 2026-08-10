@@ -13,7 +13,7 @@ export default function DashboardLayout({
       <div className="flex flex-1 flex-col overflow-hidden">
         <Header />
         <ScrollRestorationArea className="flex-1 overflow-y-auto bg-background">
-          <div className="mx-auto max-w-7xl p-6">
+          <div className="mx-auto w-full max-w-7xl p-4 sm:p-6">
             {children}
           </div>
         </ScrollRestorationArea>

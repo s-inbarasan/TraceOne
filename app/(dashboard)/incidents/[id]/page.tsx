@@ -64,7 +64,7 @@ export default function IncidentDetailPage({ params }: { params: Promise<{ id: s
 
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
-      <div className="flex items-center justify-between border-b border-border pb-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border pb-4">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" asChild>
             <Link href="/dashboard">

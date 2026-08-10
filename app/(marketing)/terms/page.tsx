@@ -91,7 +91,7 @@ export default function TermsOfServicePage() {
 
           <h2 className="text-xl font-semibold text-foreground mt-8">14. Contact Information</h2>
           <p>
-            For any questions about these Terms, please contact us at support@traceone.example.com.
+            For any questions about these Terms, please contact us at s.inbarasan.zv@gmail.com.
           </p>
         </div>
       </div>
