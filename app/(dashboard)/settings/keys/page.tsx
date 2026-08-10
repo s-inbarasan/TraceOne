@@ -124,7 +124,7 @@ export default function ApiKeysPage() {
                     {provider.name.toLowerCase().includes('anthropic') && <AnthropicLogo className="size-6 flex-shrink-0" />}
                     {provider.name.toLowerCase().includes('nvidia') && <NvidiaLogo className="size-6 flex-shrink-0" />}
                     {provider.name.toLowerCase().includes('groq') && <GroqLogo className="size-6 flex-shrink-0" />}
-                    {(provider.name.toLowerCase().includes('grok') || provider.name.toLowerCase().includes('xai')) && <GrokLogo className="size-6 flex-shrink-0 rounded-full object-contain" />}
+                    {(provider.name.toLowerCase().includes('grok') || provider.name.toLowerCase().includes('xai')) && <GrokLogo className="size-6 flex-shrink-0 rounded-md object-contain" />}
                     <span>{provider.name}</span>
                     {isConfigured ? (
                       <Badge variant="default" className="text-[10px] h-5 px-1.5 flex items-center gap-1 bg-green-500/10 text-green-500 hover:bg-green-500/20 border-green-500/20 shrink-0">

@@ -35,7 +35,7 @@ export default function LandingPage() {
         </section>
 
         {/* Workflow Pipeline Section */}
-        <section id="how-it-works" className="py-16 md:py-24 border-t border-border/40 bg-secondary/20">
+        <section className="py-16 md:py-24 border-t border-border/40 bg-secondary/20">
           <div className="container px-4 md:px-6 max-w-6xl mx-auto">
             <div className="text-center mb-16">
               <h2 className="text-3xl font-bold tracking-tight md:text-4xl">The complete incident resolution pipeline</h2>
@@ -85,7 +85,7 @@ export default function LandingPage() {
         </section>
 
         {/* Product UI Previews */}
-        <section id="features" className="py-16 md:py-32">
+        <section className="py-16 md:py-32">
           <div className="container px-4 md:px-6 max-w-6xl mx-auto">
             <div className="grid gap-16 lg:grid-cols-2 lg:gap-24 items-center">
               <div className="space-y-6">
@@ -148,6 +148,8 @@ export default function LandingPage() {
           </div>
         </section>
       </main>
+
+
     </div>
   );
 }

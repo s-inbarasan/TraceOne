@@ -515,13 +515,103 @@ export const GroqAdapter: AIProviderAdapter = {
   }
 };
 
+// 6. xAI Adapter
+export const xAIAdapter: AIProviderAdapter = {
+  providerName: "xAI",
+  async discoverModels(apiKey: string): Promise<ModelMetadata[]> {
+    const res = await fetch("https://api.x.ai/v1/models", {
+      headers: {
+        "Authorization": `Bearer ${apiKey}`
+      }
+    });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.error?.message || `xAI API validation failed with status ${res.status}`);
+    }
+    const data = await res.json();
+    const models = data.data || [];
+    
+    const compatible = models.filter((m: any) => {
+      const id = m.id.toLowerCase();
+      return id.includes("grok") && !id.includes("vision");
+    });
+
+    if (compatible.length === 0) {
+      return [
+        { id: "grok-2-latest", displayName: "Grok 2", capabilities: ["chat", "code", "analysis"] },
+        { id: "grok-beta", displayName: "Grok Beta", capabilities: ["chat", "code", "analysis"] }
+      ];
+    }
+
+    return compatible.map((m: any) => ({
+      id: m.id,
+      displayName: m.id,
+      capabilities: ["chat", "code", "analysis"]
+    }));
+  },
+
+  selectBestModel(models: ModelMetadata[]): string {
+    const ids = models.map(m => m.id);
+    const preferred = [
+      "grok-2-latest",
+      "grok-2",
+      "grok-beta"
+    ];
+
+    for (const pref of preferred) {
+      if (ids.includes(pref)) return pref;
+    }
+
+    return ids[0] || "grok-2-latest";
+  },
+
+  async generateContent(apiKey: string, model: string, prompt: string, systemInstruction?: string): Promise<NormalizedResponse> {
+    const messages = [];
+    if (systemInstruction) {
+      messages.push({ role: "system", content: systemInstruction });
+    }
+    messages.push({ role: "user", content: prompt });
+
+    const res = await fetch("https://api.x.ai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model: model,
+        messages: messages,
+        temperature: 0.2
+      })
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.error?.message || `xAI API error: ${res.statusText}`);
+    }
+
+    return {
+      text: data.choices[0]?.message?.content || "",
+      model: model,
+      provider: "xAI",
+      usage: data.usage ? {
+        inputTokens: data.usage.prompt_tokens,
+        outputTokens: data.usage.completion_tokens,
+        totalTokens: data.usage.total_tokens,
+      } : undefined
+    };
+  }
+};
+
 // --- ADAPTER REGISTRY ---
 const adapters: Record<string, AIProviderAdapter> = {
   gemini: GeminiAdapter,
   openai: OpenAIAdapter,
   anthropic: AnthropicAdapter,
   nvidia: NVIDIAAdapter,
-  groq: GroqAdapter
+  groq: GroqAdapter,
+  xai: xAIAdapter,
+  grok: xAIAdapter
 };
 
 export function getAdapter(provider: string): AIProviderAdapter | null {

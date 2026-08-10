@@ -31,21 +31,12 @@ import {
   Brain,
   Cpu,
   Zap,
-  ExternalLink,
-  Trash2
+  ExternalLink
 } from "lucide-react"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
 import { GithubIcon } from "@/components/ui/icons"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
-import { GeminiLogo, OpenAILogo, AnthropicLogo, NvidiaLogo, GroqLogo } from "@/components/ui/ai-logos"
+import { GeminiLogo, OpenAILogo, AnthropicLogo, NvidiaLogo, GroqLogo, GrokLogo } from "@/components/ui/ai-logos"
 
 function getModelProviderIcon(modelName: string, className = "size-3.5") {
   const model = modelName.toLowerCase();
@@ -63,6 +54,9 @@ function getModelProviderIcon(modelName: string, className = "size-3.5") {
   }
   if (model.includes('groq') || model.includes('70b-versatile')) {
     return <GroqLogo className={className} />
+  }
+  if (model.includes('grok') || model.includes('xai')) {
+    return <GrokLogo className={`${className} rounded-sm object-contain`} />
   }
   return <Bot className={className} />
 }
@@ -123,10 +117,6 @@ export default function ProjectWorkspacePage({ params }: { params: Promise<{ id:
   const [configuredProviders, setConfiguredProviders] = useState<any[]>([])
   const [keysLoaded, setKeysLoaded] = useState(false)
   const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false)
-
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
-  const [deleteConfirmation, setDeleteConfirmation] = useState("")
-  const [isDeleting, setIsDeleting] = useState(false)
 
   const [filePaths, setFilePaths] = useState<string[]>([])
   const [fileContents, setFileContents] = useState<Record<string, string>>({})
@@ -401,34 +391,6 @@ export default function ProjectWorkspacePage({ params }: { params: Promise<{ id:
     fetchKeys()
   }, [])
 
-
-  const handleDeleteProject = async () => {
-    if (!project || deleteConfirmation !== project.name) return;
-    try {
-      setIsDeleting(true);
-      const res = await fetch(`/api/projects?id=${project.id}`, {
-        method: "DELETE",
-      });
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || "Failed to delete project");
-      }
-      addNotification({
-        title: "Project Deleted",
-        message: "The project has been permanently removed.",
-        type: "success",
-      });
-      router.push("/projects");
-    } catch (err: any) {
-      console.error(err);
-      addNotification({
-        title: "Deletion Failed",
-        message: err.message,
-        type: "error",
-      });
-      setIsDeleting(false);
-    }
-  };
 
   // Add effect to scroll to bottom on new messages or initial load
   useEffect(() => {
@@ -956,15 +918,6 @@ export default function ProjectWorkspacePage({ params }: { params: Promise<{ id:
         <div className="flex items-center gap-2 flex-wrap mt-2 sm:mt-0">
           <Button 
             size="sm" 
-            variant="ghost"
-            className="gap-1.5 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
-            onClick={() => setIsDeleteDialogOpen(true)}
-          >
-            <Trash2 className="size-3.5" />
-            Delete Project
-          </Button>
-          <Button 
-            size="sm" 
             variant="outline"
             className="gap-1.5 text-xs" 
             onClick={handleRunAutoInvestigation}
@@ -1392,60 +1345,6 @@ export default function ProjectWorkspacePage({ params }: { params: Promise<{ id:
 
         </div>
       </div>
-
-      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-destructive">
-              <AlertCircle className="size-5" />
-              Delete Project
-            </DialogTitle>
-            <DialogDescription className="text-xs">
-              This action cannot be undone. This will permanently delete the project
-              <strong className="text-foreground mx-1">{project.name}</strong>
-              and remove all associated data including connected repositories, incidents, investigations, patches, analysis runs, and pull-request records.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-4">
-            <p className="text-xs text-muted-foreground mb-2">
-              Please type <strong className="text-foreground">{project.name}</strong> to confirm.
-            </p>
-            <Input
-              value={deleteConfirmation}
-              onChange={(e) => setDeleteConfirmation(e.target.value)}
-              placeholder={project.name}
-              className="font-mono text-sm"
-              disabled={isDeleting}
-            />
-          </div>
-          <DialogFooter className="gap-2 sm:gap-0">
-            <Button
-              variant="outline"
-              onClick={() => {
-                setIsDeleteDialogOpen(false);
-                setDeleteConfirmation("");
-              }}
-              disabled={isDeleting}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={handleDeleteProject}
-              disabled={deleteConfirmation !== project.name || isDeleting}
-            >
-              {isDeleting ? (
-                <>
-                  <Loader2 className="size-4 animate-spin mr-2" />
-                  Deleting...
-                </>
-              ) : (
-                "Delete Project"
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }
